@@ -28,13 +28,13 @@ func ActivationCodeWithProfile(shellName, projectEnvDir, envName, profilePath st
 	if profilePath != "" {
 		// Source only if file exists (defensive)
 		return fmt.Sprintf(
-			"export SHELLENV_ACTIVE=1; export SHELLENV_ENV_NAME=%s; export PATH=%s:$PATH; export PS1=\"(shellenv:%s) $PS1\"; [ -f %q ] && . %q;",
+			"export SHELLENV_ACTIVE=1; export SHELLENV_ENV_NAME=%s; export PATH=%s:$PATH; export PS1=\"(shellenv:%s) ${PS1:-}\"; [ -f %q ] && . %q;",
 			envName, envBin, envName, profilePath, profilePath,
 		)
 	}
 
 	return fmt.Sprintf(
-		"export SHELLENV_ACTIVE=1; export SHELLENV_ENV_NAME=%s; export PATH=%s:$PATH; export PS1=\"(shellenv:%s) $PS1\";",
+		"export SHELLENV_ACTIVE=1; export SHELLENV_ENV_NAME=%s; export PATH=%s:$PATH; export PS1=\"(shellenv:%s) ${PS1:-}\";",
 		envName, envBin, envName,
 	)
 }
