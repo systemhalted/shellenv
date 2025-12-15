@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -14,8 +15,16 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := ExecuteWithArgs(os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// ExecuteWithArgs allows tests to run commands with custom args and writers.
+func ExecuteWithArgs(args []string, stdout, stderr io.Writer) error {
+	rootCmd.SetArgs(args)
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	return rootCmd.Execute()
 }
