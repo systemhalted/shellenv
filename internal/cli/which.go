@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/example/shellenv/internal/project"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/project"
 )
 
 func init() { rootCmd.AddCommand(whichCmd) }

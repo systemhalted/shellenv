@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/example/shellenv/internal/env"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/env"
 )
 
 func init() { rootCmd.AddCommand(uninstallCmd) }
@@ -23,9 +23,13 @@ var uninstallCmd = &cobra.Command{
 			return fmt.Errorf("expected <shell>@<version>, got %q", pair)
 		}
 		inst, err := env.InstallsDir()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		dir := filepath.Join(inst, parts[0], parts[1])
-		if err := os.RemoveAll(dir); err != nil { return err }
+		if err := os.RemoveAll(dir); err != nil {
+			return err
+		}
 		fmt.Printf("Uninstalled %s@%s\n", parts[0], parts[1])
 		return nil
 	},

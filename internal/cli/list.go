@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/example/shellenv/internal/project"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/project"
 )
 
 func init() { rootCmd.AddCommand(listCmd) }
@@ -16,8 +16,12 @@ var listCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, _ := os.Getwd()
 		items, err := project.ListEnvs(cwd)
-		if err != nil { return err }
-		for _, n := range items { fmt.Println(n) }
+		if err != nil {
+			return err
+		}
+		for _, n := range items {
+			fmt.Println(n)
+		}
 		return nil
 	},
 }

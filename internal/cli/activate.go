@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/example/shellenv/internal/project"
-	"github.com/example/shellenv/internal/shell"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/project"
+	"github.com/systemhalted/shellenv/internal/shell"
 )
 
 var actShellType string

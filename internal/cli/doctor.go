@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/example/shellenv/internal/env"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/env"
 )
 
 func init() { rootCmd.AddCommand(doctorCmd) }
@@ -15,7 +15,9 @@ var doctorCmd = &cobra.Command{
 	Short: "Check environment health",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		h, err := env.EnsureHome()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		shims, _ := env.ShimsDir()
 		fmt.Printf("Home:  %s\n", h)
 		fmt.Printf("Shims: %s\n", shims)

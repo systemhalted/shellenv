@@ -18,11 +18,34 @@ func writeTmp(t *testing.T, dir, name, content string) string {
 	return p
 }
 
-func TestResolveProfile_PrefersEnvOverride(t *testing.T) {
-	// Arrange: three possible locations with the same profile name
-	tmp := t.TempDir()
-	envDir := filepath.Join(tmp, "envprofiles")
-	projectDir := filepath.Join(tmp, "project")
-	binDir := filepath.Join(tmp, "bin") // we won't rely on os.Executable() in this test
-	_ = os.MkdirAll(envDir, 0o755)
-	_ = os.MkdirAll(_
+func TestResolveProfile_EnvOverride(t *testing.T) {
+	t.Setenv("SHELLENV_PROFILES", t.TempDir())
+	want := writeTmp(t, os.Getenv("SHELLENV_PROFILES"), "custom.sh", "#!/bin/sh\necho env\n")
+
+	got, ok := ResolveProfile("", "custom")
+	if !ok {
+		t.Fatalf("expected profile to resolve")
+	}
+	if got != want {
+		t.Fatalf("expected %s, got %s", want, got)
+	}
+}
+
+func TestResolveProfile_ProjectDirectory(t *testing.T) {
+	projectDir := t.TempDir()
+	want := writeTmp(t, projectDir, "profiles/strict.sh", "#!/bin/sh\n")
+
+	got, ok := ResolveProfile(projectDir, "strict")
+	if !ok {
+		t.Fatalf("expected profile to resolve")
+	}
+	if got != want {
+		t.Fatalf("expected %s, got %s", want, got)
+	}
+}
+
+func TestResolveProfile_NotFound(t *testing.T) {
+	if _, ok := ResolveProfile("", "missing"); ok {
+		t.Fatalf("expected missing profile to return ok=false")
+	}
+}

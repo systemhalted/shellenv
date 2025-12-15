@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/example/shellenv/internal/project"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/project"
 )
 
 func init() { rootCmd.AddCommand(destroyCmd) }
@@ -21,7 +21,9 @@ var destroyCmd = &cobra.Command{
 		if _, err := os.Stat(pdir); err != nil {
 			return fmt.Errorf("env %q not found at %s", name, pdir)
 		}
-		if err := os.RemoveAll(pdir); err != nil { return err }
+		if err := os.RemoveAll(pdir); err != nil {
+			return err
+		}
 		fmt.Printf("Destroyed env %q\n", name)
 		return nil
 	},

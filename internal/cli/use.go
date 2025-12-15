@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/example/shellenv/internal/project"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/project"
 )
 
 func init() { rootCmd.AddCommand(useCmd) }
@@ -20,7 +20,9 @@ var useCmd = &cobra.Command{
 		if _, err := os.Stat(project.EnvDir(cwd, name)); err != nil {
 			return fmt.Errorf("env %q not found (run 'shellenv create --name %s ...')", name, name)
 		}
-		if err := project.WriteCurrent(cwd, name); err != nil { return err }
+		if err := project.WriteCurrent(cwd, name); err != nil {
+			return err
+		}
 		fmt.Printf("Now using env %q in this project\n", name)
 		return nil
 	},

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/example/shellenv/internal/env"
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/env"
 )
 
 func init() { rootCmd.AddCommand(versionsCmd) }
@@ -16,7 +16,9 @@ var versionsCmd = &cobra.Command{
 	Short: "List installed shell runtimes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		inst, err := env.InstallsDir()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		_ = os.MkdirAll(inst, 0o755)
 		entries, _ := os.ReadDir(inst)
 		if len(entries) == 0 {
@@ -24,10 +26,14 @@ var versionsCmd = &cobra.Command{
 			return nil
 		}
 		for _, sh := range entries {
-			if !sh.IsDir() { continue }
+			if !sh.IsDir() {
+				continue
+			}
 			vers, _ := os.ReadDir(filepath.Join(inst, sh.Name()))
 			for _, v := range vers {
-				if v.IsDir() { fmt.Printf("%s@%s\n", sh.Name(), v.Name()) }
+				if v.IsDir() {
+					fmt.Printf("%s@%s\n", sh.Name(), v.Name())
+				}
 			}
 		}
 		return nil
