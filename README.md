@@ -49,6 +49,7 @@ echo "$SHELLENV_ENV_NAME"            # -> default
 ## Testing and dev notes
 - Unit tests: `make test`.
 - Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`.
+- If your environment restricts writing to the default Go cache, run unit tests with a repo-local cache: `GOCACHE=$PWD/.cache/go-build go test ./...`.
 - Keep experiments isolated by pointing `SHELLENV_HOME` at a temp directory when hacking on the tool.
 
 ## Example workflow

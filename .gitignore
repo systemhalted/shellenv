@@ -1,0 +1,25 @@
+# Go build caches
+/.cache/
+/.gocache/
+
+# Build outputs
+/dist/
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Project-local environments and temp dirs
+/.shellenv/
+/tmp/
+/proj/
+
+# Test artifacts
+coverage.out
+
+# Editor/OS noise
+.DS_Store
+.idea/
+.vscode/
