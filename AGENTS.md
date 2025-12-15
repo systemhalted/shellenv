@@ -27,10 +27,20 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 - Integration: Add `*.bats` under `test/integration`; use `run` and `assert` helpers, and point `SHELLENV_HOME` to a temp directory.
 - If adding new profiles or activation logic, cover both Go unit tests and a Bats round-trip (create → activate → echo marker vars).
 
+
+## Documentation
+- Primary docs live in README.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, and docs/TASKS.md. Add new docs under docs/ only when needed; get maintainer buy-in and link them from README.md.
+- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = design, flows, sequences; docs/TASKS.md = AI task log for completed work; add release notes/changelog to docs/ when we start versioning.
+- Update docs whenever behavior changes: new/changed commands, flags, env vars, profiles, activation logic, or config defaults; keep examples in sync.
+- Style/ownership: short headings, concise sentences, consistent formatting; a reviewer must sign off doc updates that accompany behavior changes.
+- Always update the necessary files after completion of work and before the code is committed and pushed to the remote repo.
+
+
 ## Commit & Pull Request Guidelines
 - Use concise, imperative commit messages (e.g., `Add profile resolver guard`, `Tighten activation prompt formatting`). No history exists yet, so set the tone.
 - PRs should describe behavior changes, include reproduction/verification steps (`make build`, `make test`, `bats -r test/integration`), and note any env vars or new flags.
 - Add tests with new features or bug fixes; call out gaps explicitly if something cannot be covered.
+
 
 ## Security & Configuration Tips
 - Develop with `SHELLENV_HOME` pointed at a throwaway directory to keep installs and shims out of your main home.
