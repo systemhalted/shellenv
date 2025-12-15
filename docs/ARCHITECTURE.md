@@ -7,9 +7,10 @@ shellenv provides per-project shell sandboxes so scripts can be exercised agains
 - **Project envs** (`./.shellenv/<env>`): contain `metadata.json`, a `bin/` directory for project-local tools, and optional helper files (e.g., `activate.sh`). `shellenv create` scaffolds this structure; `shellenv use` records the current env in `./.shellenv/current`.
 - **Profiles**: sourced shell options under `profiles/` (built-ins: `strict`, `posix`, `interactive`). Overridable via `SHELLENV_PROFILES` or `./profiles/`.
 
-## Key packages
-- `cmd/shellenv`: CLI entrypoint that wires Cobra commands.
-- `internal/cli/*`: command implementations (`init`, `create`, `activate`, `exec`, `install`, etc.).
+## Key packages and libraries
+- **Cobra (github.com/spf13/cobra)**: command-line framework used to define commands, flags, help text, and dispatch (`rootCmd` + subcommands under `internal/cli`). Each command’s `RunE` returns an error so non-zero exits propagate.
+- `cmd/shellenv`: CLI entrypoint calling `cli.Execute()` to run the Cobra root command.
+- `internal/cli/*`: Cobra command implementations (`init`, `create`, `activate`, `exec`, `install`, etc.).
 - `internal/env`: resolves and prepares `SHELLENV_HOME`.
 - `internal/project`: per-project metadata reading/writing, env listing, and current-env tracking.
 - `internal/shell`: activation snippet generation and profile resolution.
@@ -22,6 +23,12 @@ shellenv provides per-project shell sandboxes so scripts can be exercised agains
 - **install/uninstall/versions**: placeholder runtime managers that create/remove directories under `$SHELLENV_HOME/installs/`.
 - **which**: resolves a binary preferring the env `bin/` folder.
 - **destroy/list**: remove or enumerate project envs under `./.shellenv`.
+
+### Command selection details
+- **Env selection**: `activate`/`exec` pick env → CLI arg > `./.shellenv/current` > `default`.
+- **Profile lookup**: `SHELLENV_PROFILES` > `./profiles/<name>.sh` > alongside the built binary (`dist/.../profiles`).
+- **PATH resolution in exec**: `exec` prepends `<env>/bin` to PATH and resolves the command path manually, honoring the hardened Go 1.19+ rule that ignores the current directory. This ensures project-local shims/binaries run even when the OS PATH search would skip `./`.
+- **Fish vs POSIX**: activation for fish skips profile sourcing (no POSIX `source`) and uses fish env syntax; bash/zsh/posix shells get `SHELLENV_*`, prompt prefix, and optional profile sourcing.
 
 ## Environment variables
 - `SHELLENV_HOME`: global state root (default `~/.shellenv`).
