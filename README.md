@@ -34,7 +34,38 @@ eval "$(./dist/shellenv activate)"   # or: ./dist/shellenv exec -- <cmd>
 echo "$SHELLENV_ENV_NAME"            # -> default
 ```
 
+## Using shellenv in your project
+
+What the steps below do (and why they’re safe):
+- `export SHELLENV_HOME="$(mktemp -d)"` keeps installs/shims/cache in a throwaway dir so nothing touches your real home; delete it when you’re done.
+- If your system lacks `mktemp`, manually pick/create a directory you control (e.g., `mkdir /tmp/shellenv-home && export SHELLENV_HOME=/tmp/shellenv-home`); any empty dir works.
+- `shellenv create --name dev --shell bash@5.2 --profile strict` makes `./.shellenv/dev` in your project with metadata and a `bin/` folder only inside that project.
+- `shellenv use dev` (optional) writes `./.shellenv/current` so other commands default to that env in this project only.
+- `eval "$(shellenv activate)"` prints PATH/prompt exports for that env and applies them to your current shell, just prepending your project `bin/`.
+- `which my-tool` confirms resolution prefers your project’s env.
+- `shellenv exec -- …` runs one-off commands inside the env without changing your shell session.
+
+```bash
+# Optional: isolate installs/shims from your real home
+# Option A (if mktemp exists)
+export SHELLENV_HOME="$(mktemp -d)"
+# Option B (manual directory if mktemp is unavailable)
+# mkdir /tmp/shellenv-home && export SHELLENV_HOME=/tmp/shellenv-home
+
+# From inside your project directory
+shellenv create --name dev --shell bash@5.2 --profile strict
+# Or reuse an existing env: shellenv use dev
+
+# Activate for your shell session
+eval "$(shellenv activate)"          # prints PATH/prompt exports for the env
+which my-tool                        # resolves from ./.shellenv/dev/bin first
+
+# One-off commands without activating your shell
+shellenv exec -- env | grep SHELLENV_ENV_NAME
+```
+
 ## Docs
+- Contributor workflow and standards: `CONTRIBUTING.md`.
 - Architecture and flows: `docs/ARCHITECTURE.md`.
 - Task notes and change log: `docs/Task.md`.
 
