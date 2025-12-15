@@ -7,6 +7,9 @@ Per-project shell sandboxes for testing scripts against specific shells and opti
 - Keep experiments contained: environments live under `./.shellenv/<name>` and `SHELLENV_HOME` (default `~/.shellenv`), avoiding edits to your login shell.
 - Make cross-shell QA easy: quickly swap between `bash`, `zsh`, `fish`, or POSIX-style profiles to catch portability issues early.
 
+## Disclaimer
+This project is provided as-is with no warranties; use at your own risk. See `LICENSE` for details.
+
 ## Prerequisites
 - Go 1.22+ and `make` on your PATH.
 - Integration tests: `bats` available (e.g., `brew install bats-core`, `apk add bats`, or `npm install -g bats`).
@@ -30,6 +33,10 @@ make build
 eval "$(./dist/shellenv activate)"   # or: ./dist/shellenv exec -- <cmd>
 echo "$SHELLENV_ENV_NAME"            # -> default
 ```
+
+## Docs
+- Architecture and flows: `docs/ARCHITECTURE.md`.
+- Task notes and change log: `docs/Task.md`.
 
 ## Common commands
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict]`: scaffold a project env.

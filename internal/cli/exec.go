@@ -25,18 +25,18 @@ var execCmd = &cobra.Command{
 		if dash > 1 {
 			return fmt.Errorf("expected at most one env name before --")
 		}
-		if dash == len(args)-1 {
+
+		argsBeforeDash := dash
+		argsAfterDash := len(args) - dash
+		if argsAfterDash == 0 {
 			return fmt.Errorf("missing command after --")
 		}
-
 		var envName string
 		var cmdArgs []string
-		if dash == 1 {
+		if argsBeforeDash == 1 {
 			envName = args[0]
-			cmdArgs = args[1:]
-		} else { // dash == 0
-			cmdArgs = args
 		}
+		cmdArgs = args[dash:]
 
 		cwd, _ := os.Getwd()
 		if envName == "" {
@@ -60,7 +60,12 @@ var execCmd = &cobra.Command{
 			"SHELLENV_ACTIVE=1",
 		)
 
-		child := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+		cmdPath, err := resolveCommandPath(cmdArgs[0], childEnv)
+		if err != nil {
+			return err
+		}
+
+		child := exec.Command(cmdPath, cmdArgs[1:]...)
 		child.Env = childEnv
 		child.Stdout = os.Stdout
 		child.Stderr = os.Stderr
@@ -83,4 +88,39 @@ func prependPath(env []string, bin string) []string {
 		}
 	}
 	return append(env, fmt.Sprintf("PATH=%s", bin))
+}
+
+func resolveCommandPath(name string, env []string) (string, error) {
+	// If the user provided a path (./cmd or /abs/path), use it directly.
+	if strings.ContainsRune(name, os.PathSeparator) {
+		return name, nil
+	}
+	pathVar := pathFromEnv(env)
+	for _, dir := range filepath.SplitList(pathVar) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, name)
+		if isExecutable(candidate) {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("command %q not found in PATH", name)
+}
+
+func pathFromEnv(env []string) string {
+	for _, v := range env {
+		if strings.HasPrefix(v, "PATH=") {
+			return strings.TrimPrefix(v, "PATH=")
+		}
+	}
+	return os.Getenv("PATH")
+}
+
+func isExecutable(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil || fi.IsDir() {
+		return false
+	}
+	return fi.Mode()&0o111 != 0
 }
