@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,6 +78,149 @@ func TestExecRunsCommandWithEnvVars(t *testing.T) {
 	}
 	if !strings.HasPrefix(lines[1], binDir) && !strings.HasPrefix(lines[1], resolvedBin) {
 		t.Fatalf("expected PATH to start with env bin dir, got %s", lines[1])
+	}
+}
+
+func TestExecIsolatesHomeAndTmpdir(t *testing.T) {
+	dir := t.TempDir()
+
+	envDir := project.EnvDir(dir, "default")
+	binDir := filepath.Join(envDir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	// Script records HOME/TMPDIR and writes marker files into each.
+	script := filepath.Join(binDir, "probe")
+	content := "#!/bin/sh\nprintf \"%s\\n%s\\n\" \"$HOME\" \"$TMPDIR\" > \"$1\"\n: > \"$HOME/marker\"\n: > \"$TMPDIR/tmpmarker\"\n"
+	if err := os.WriteFile(script, []byte(content), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	output := filepath.Join(dir, "out.txt")
+
+	if _, stderr, err := runCLI(t, dir, "exec", "--", "probe", output); err != nil {
+		t.Fatalf("exec returned error: %v (stderr: %s)", err, stderr)
+	}
+
+	data, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected HOME and TMPDIR lines, got %q", data)
+	}
+	homeSuffix := filepath.Join(".shellenv", "default", "home")
+	tmpSuffix := filepath.Join(".shellenv", "default", "home", "tmp")
+	if !strings.HasSuffix(lines[0], homeSuffix) {
+		t.Fatalf("HOME %q does not point at sandbox home %q", lines[0], homeSuffix)
+	}
+	if !strings.HasSuffix(lines[1], tmpSuffix) {
+		t.Fatalf("TMPDIR %q does not point at sandbox tmp %q", lines[1], tmpSuffix)
+	}
+	// Writes must land inside the sandbox, not the real home/temp dir.
+	sandbox := project.SandboxHomeDir(dir, "default")
+	if _, err := os.Stat(filepath.Join(sandbox, "marker")); err != nil {
+		t.Fatalf("HOME marker not written to sandbox: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(sandbox, "tmp", "tmpmarker")); err != nil {
+		t.Fatalf("TMPDIR marker not written to sandbox tmp: %v", err)
+	}
+}
+
+func TestExecWithProfileSourcesProfile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Project-local profile that exports a sentinel variable.
+	profDir := filepath.Join(dir, "profiles")
+	if err := os.MkdirAll(profDir, 0o755); err != nil {
+		t.Fatalf("mkdir profiles: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profDir, "strict.sh"), []byte("export SE_PROFILE_OK=yes\n"), 0o644); err != nil {
+		t.Fatalf("write profile: %v", err)
+	}
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	output := filepath.Join(dir, "profile-out.txt")
+	cmd := fmt.Sprintf("printf %%s \"$SE_PROFILE_OK\" > %q", output)
+
+	// With --profile the sentinel is sourced and reaches the command.
+	if _, stderr, err := runCLI(t, dir, "exec", "--profile", "--", "bash", "-c", cmd); err != nil {
+		t.Fatalf("exec --profile returned error: %v (stderr: %s)", err, stderr)
+	}
+	if got, _ := os.ReadFile(output); string(got) != "yes" {
+		t.Fatalf("expected profile sentinel \"yes\", got %q", got)
+	}
+
+	// Without --profile the profile is not sourced, so the sentinel is empty.
+	_ = os.Remove(output)
+	if _, stderr, err := runCLI(t, dir, "exec", "--", "bash", "-c", cmd); err != nil {
+		t.Fatalf("exec returned error: %v (stderr: %s)", err, stderr)
+	}
+	if got, _ := os.ReadFile(output); string(got) != "" {
+		t.Fatalf("expected no profile sentinel without --profile, got %q", got)
+	}
+}
+
+func TestExecWithProfileAppliesShellOptionsToDirectCommand(t *testing.T) {
+	dir := t.TempDir()
+
+	profDir := filepath.Join(dir, "profiles")
+	if err := os.MkdirAll(profDir, 0o755); err != nil {
+		t.Fatalf("mkdir profiles: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profDir, "strict.sh"), []byte("set -e\n"), 0o644); err != nil {
+		t.Fatalf("write profile: %v", err)
+	}
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	// `false` runs directly in the profiled shell, so errexit aborts it.
+	_, _, err := runCLI(t, dir, "exec", "--profile", "--", "false")
+	if err == nil {
+		t.Fatalf("expected non-zero exit from errexit-aborted command, got nil")
+	}
+}
+
+func TestExecWithProfileErrorsWhenProfileMissing(t *testing.T) {
+	dir := t.TempDir()
+
+	// Env exists but no resolvable profile is available.
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	_, _, err := runCLI(t, dir, "exec", "--profile", "--", "bash", "-c", "true")
+	if err == nil || !strings.Contains(err.Error(), "profile \"strict\" not found") {
+		t.Fatalf("expected profile-not-found error, got %v", err)
+	}
+}
+
+func TestExecPropagatesChildExitCode(t *testing.T) {
+	dir := t.TempDir()
+
+	binDir := filepath.Join(project.EnvDir(dir, "default"), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	script := filepath.Join(binDir, "boom")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 3\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "exec", "--", "boom")
+	var ee *exitError
+	if !errors.As(err, &ee) {
+		t.Fatalf("expected *exitError, got %v", err)
+	}
+	if ee.code != 3 {
+		t.Fatalf("expected exit code 3, got %d", ee.code)
+	}
+	// The child's failure must not trigger Cobra's usage dump.
+	if strings.Contains(stderr, "Usage:") {
+		t.Fatalf("did not expect usage output on child exit, got: %s", stderr)
 	}
 }
 

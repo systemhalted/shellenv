@@ -21,9 +21,19 @@ func EnvDir(cwd, name string) string {
 	return filepath.Join(cwd, ".shellenv", name)
 }
 
+// SandboxHomeDir is a per-env directory used as HOME (and the root of the
+// isolated TMPDIR/XDG locations) when running commands via `exec`, so scripts
+// write here instead of the user's real home.
+func SandboxHomeDir(cwd, name string) string {
+	return filepath.Join(EnvDir(cwd, name), "home")
+}
+
 func WriteMetadata(cwd string, md Metadata) error {
 	dir := EnvDir(cwd, md.Name)
 	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(SandboxHomeDir(cwd, md.Name), 0o755); err != nil {
 		return err
 	}
 	md.Created = time.Now().UTC().Format(time.RFC3339)

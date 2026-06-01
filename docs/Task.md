@@ -10,5 +10,11 @@
 - Clarified `SHELLENV_HOME` setup with both mktemp-based and manual directory options for environments without `mktemp`.
 - Added `CONTRIBUTING.md` with contributor workflow, testing commands, coding style, doc ownership, and safety guidance; linked from README.
 - Recorded this task log in `docs/Task.md`.
+- Expanded `docs/ARCHITECTURE.md` with an honest Isolation Model (PATH-shimming, boundary table, intended use vs non-use) and a Limitations section enumerating the P0/P1/P2 gaps.
+- Added `docs/DESIGN.md` capturing eight design decisions (rationale/trade-offs/status) and a gap-closing Roadmap (R1–R6); linked it from `README.md`.
+- R1: `exec` now isolates `HOME`/`TMPDIR`/`XDG_*` to a per-env sandbox (`./.shellenv/<env>/home/`); added `project.SandboxHomeDir` and an `upsertEnv` helper.
+- R2: added `exec --profile` (opt-in), which sources the env's declared profile through the declared shell (`profileShell`) before running the command.
+- Added exec tests for HOME/TMPDIR isolation and profile sourcing; updated ARCHITECTURE/DESIGN/README to match.
+- R2 polish: silenced Cobra's usage/duplicate-error dump (`SilenceUsage`/`SilenceErrors`); `exec` now propagates a child's real exit code via an `exitError` type instead of always exiting 1, and runtime errors print a single clean line.
 
 Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.

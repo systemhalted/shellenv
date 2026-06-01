@@ -66,13 +66,14 @@ shellenv exec -- env | grep SHELLENV_ENV_NAME
 
 ## Docs
 - Contributor workflow and standards: `CONTRIBUTING.md`.
-- Architecture and flows: `docs/ARCHITECTURE.md`.
+- Architecture, isolation model, and flows: `docs/ARCHITECTURE.md`.
+- Design decisions, rationale, and roadmap: `docs/DESIGN.md`.
 - Task notes and change log: `docs/Task.md`.
 
 ## Common commands
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict]`: scaffold a project env.
 - `shellenv activate [<env>] [--shell-type bash|zsh|fish]`: print activation snippet to `eval`.
-- `shellenv exec [<env>] -- <cmd> [args]`: run a command without interactive activation.
+- `shellenv exec [<env>] [--profile] -- <cmd> [args]`: run a command without interactive activation; `HOME`/`TMPDIR`/`XDG_*` are redirected to a per-env sandbox, and `--profile` sources the env's profile (e.g. `strict`) first.
 - `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: choose, inspect, or remove project envs.
 - `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (placeholder installers today).
 - `shellenv which <binary>`: resolve a tool inside the active env; `shellenv doctor`: quick health check.
