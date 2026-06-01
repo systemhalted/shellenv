@@ -7,62 +7,115 @@ Per-project shell sandboxes for testing scripts against specific shells and opti
 - Keep experiments contained: environments live under `./.shellenv/<name>` and `SHELLENV_HOME` (default `~/.shellenv`), avoiding edits to your login shell.
 - Make cross-shell QA easy: quickly swap between `bash`, `zsh`, `fish`, or POSIX-style profiles to catch portability issues early.
 
+> **Scope:** shellenv is a *PATH-shimming* sandbox for not polluting your own shell while you test scripts — not a security sandbox for untrusted code. See `docs/ARCHITECTURE.md` for exactly what is and isn't isolated.
+
 ## Disclaimer
 This project is provided as-is with no warranties; use at your own risk. See `LICENSE` for details.
 
-## Prerequisites
-- Go 1.22+ and `make` on your PATH.
-- Integration tests: `bats` available (e.g., `brew install bats-core`, `apk add bats`, or `npm install -g bats`).
+## Install & build
+Prerequisites: **Go 1.22+** and `make` on your `PATH` (plus [`bats`](https://github.com/bats-core/bats-core) only if you run the integration tests).
 
-## How it fits together
-- **Global home**: `shellenv init` ensures `SHELLENV_HOME` exists with `installs/`, `shims/`, `cache/`, and `tmp/`. Add `"$SHELLENV_HOME/shims"` to `PATH` if you use shims.
-- **Project envs**: `shellenv create` writes metadata and a `bin/` directory to `./.shellenv/<env>`. Activation sets `SHELLENV_ACTIVE=1`, `SHELLENV_ENV_NAME`, prepends `bin/` to `PATH`, and prefixes your prompt.
-- **Profiles**: Built-ins live in `profiles/` (`strict`, `posix`, `interactive`). `shellenv activate` will source a profile if found via `SHELLENV_PROFILES`, `./profiles/`, or next to the binary.
-- **Runtimes**: `shellenv install <shell>@<version>` and `shellenv uninstall …` manage placeholders under `$SHELLENV_HOME/installs/`; `shellenv versions` lists what’s there.
+```bash
+make build          # produces ./dist/shellenv
+```
+
+The examples below call the binary as `shellenv`; from a fresh checkout use `./dist/shellenv` (or put `dist/` on your `PATH`).
+
+## Concepts
+- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `shims/`, `cache/`, and `tmp/`. Point it at a throwaway directory while experimenting to keep your real home pristine.
+- **Project envs** (`./.shellenv/<env>/`): created by `shellenv create`. Each holds `metadata.json` (declared shell + profile), a `bin/` directory for project-local tools, and a sandbox `home/` directory used by `exec` (below).
+- **Profiles**: option presets sourced into the shell — built-ins `strict` (`set -euo pipefail`), `posix` (`set -o posix`), and `interactive`. Resolved via `SHELLENV_PROFILES` → `./profiles/<name>.sh` → next to the binary.
+- **Shims** (`$SHELLENV_HOME/shims`): reserved for a future pyenv-style shim mechanism. It is **not used yet**, so the PATH hint printed by `shellenv init` is currently a no-op — you can ignore it.
 
 ## Quick start
 ```bash
-# Build (Go 1.22)
 make build
+./dist/shellenv init                                   # set up the global home
 
-# Initialize global home and get PATH instructions
-./dist/shellenv init
-
-# Inside a project directory
+# Inside a project directory:
 ./dist/shellenv create --shell bash@5.2 --profile strict
-eval "$(./dist/shellenv activate)"   # or: ./dist/shellenv exec -- <cmd>
-echo "$SHELLENV_ENV_NAME"            # -> default
+./dist/shellenv exec -- echo "hi from $SHELLENV_ENV_NAME"   # one-off, isolated
+eval "$(./dist/shellenv activate)"                     # or activate your shell session
 ```
 
-## Using shellenv in your project
+## Two ways to run: `activate` vs `exec`
+Both put the env's `bin/` first on `PATH`. They differ in how far the isolation goes:
 
-What the steps below do (and why they’re safe):
-- `export SHELLENV_HOME="$(mktemp -d)"` keeps installs/shims/cache in a throwaway dir so nothing touches your real home; delete it when you’re done.
-- If your system lacks `mktemp`, manually pick/create a directory you control (e.g., `mkdir /tmp/shellenv-home && export SHELLENV_HOME=/tmp/shellenv-home`); any empty dir works.
-- `shellenv create --name dev --shell bash@5.2 --profile strict` makes `./.shellenv/dev` in your project with metadata and a `bin/` folder only inside that project.
-- `shellenv use dev` (optional) writes `./.shellenv/current` so other commands default to that env in this project only.
-- `eval "$(shellenv activate)"` prints PATH/prompt exports for that env and applies them to your current shell, just prepending your project `bin/`.
-- `which my-tool` confirms resolution prefers your project’s env.
-- `shellenv exec -- …` runs one-off commands inside the env without changing your shell session.
+| | `eval "$(shellenv activate)"` | `shellenv exec -- <cmd>` |
+| --- | --- | --- |
+| Prepends env `bin/` to `PATH` | yes | yes |
+| Sets `SHELLENV_ACTIVE` / `SHELLENV_ENV_NAME` | yes | yes |
+| Sandboxes `HOME` / `TMPDIR` / `XDG_*` | **no** (real `~`) | **yes** (`./.shellenv/<env>/home/`) |
+| Applies the declared profile | yes (bash/zsh/posix; fish skips) | only with `--profile` |
+| Changes your current shell session | yes (until you reset it) | no (subprocess only) |
+| Propagates a command's exit code | n/a | yes |
+
+- Use **`activate`** for an interactive session where you want the env's tools and profile in your prompt.
+- Use **`exec`** for one-off or scripted runs you want fully contained — including writes to `$HOME` and temp files, and a faithful exit code.
+
+For both, the env is chosen as: the name you pass → `./.shellenv/current` (set by `shellenv use`) → `default`.
+
+## Walkthrough: test a script in isolation
+This runs a script through `exec` and shows that its `$HOME` writes land in the sandbox (your real home is untouched) and that its exit code is propagated.
 
 ```bash
-# Optional: isolate installs/shims from your real home
-# Option A (if mktemp exists)
-export SHELLENV_HOME="$(mktemp -d)"
-# Option B (manual directory if mktemp is unavailable)
-# mkdir /tmp/shellenv-home && export SHELLENV_HOME=/tmp/shellenv-home
+# Keep the global home off your real ~ while experimenting.
+export SHELLENV_HOME="$(mktemp -d)"     # or: mkdir /tmp/se-home && export SHELLENV_HOME=/tmp/se-home
 
-# From inside your project directory
-shellenv create --name dev --shell bash@5.2 --profile strict
-# Or reuse an existing env: shellenv use dev
+# From inside your project directory:
+shellenv create --shell bash@5.2 --profile strict   # makes ./.shellenv/default
 
-# Activate for your shell session
-eval "$(shellenv activate)"          # prints PATH/prompt exports for the env
-which my-tool                        # resolves from ./.shellenv/dev/bin first
+# A script that writes to $HOME and fails:
+cat > probe.sh <<'EOF'
+#!/bin/sh
+: > "$HOME/wrote-here"     # creates a file in $HOME
+echo "HOME is $HOME"
+exit 5
+EOF
+chmod +x probe.sh
 
-# One-off commands without activating your shell
-shellenv exec -- env | grep SHELLENV_ENV_NAME
+shellenv exec -- ./probe.sh
+echo "shellenv exit: $?"               # -> 5  (the child's real status)
+
+ls .shellenv/default/home/wrote-here   # the write landed in the sandbox
+test -e "$HOME/wrote-here" && echo "leaked!" || echo "real HOME untouched"
 ```
+
+`exec` resolves commands against the env's `bin/` first, so dropping a tool in `./.shellenv/default/bin/` lets it shadow the system copy for the duration of the run.
+
+## Applying a profile with `exec --profile`
+`--profile` sources the env's declared profile in the declared shell before running your command, so the profile's exported settings and shell options are in effect:
+
+```bash
+# strict mode (set -e) aborts a failing direct command:
+shellenv exec --profile -- false && echo reached || echo "aborted ($?)"
+# -> aborted (1)
+```
+
+**Caveat:** the profile's shell *options* (`set -e`, `set -o pipefail`, …) apply to commands the profiled shell runs directly. A command that re-invokes an interpreter — a script with its own shebang, or `bash -c '…'` — starts a fresh shell and inherits only the profile's **exported environment**, not its options. (Well-written scripts set their own `set -euo pipefail`.) Profiles resolve from `SHELLENV_PROFILES`, then `./profiles/<name>.sh`, then beside the binary — so running `./dist/shellenv` finds the built-ins shipped in this repo; an installed binary needs `./profiles` or `SHELLENV_PROFILES`.
+
+## Exit codes & CI
+`shellenv exec` exits with the command's exact status (e.g. `exit 5` above), so it composes cleanly with `set -e` and CI pipelines. Runtime failures print a single clean line rather than a usage dump:
+
+```bash
+shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non-zero test run
+```
+
+## Command reference
+- `shellenv init`: create the global home and print PATH guidance.
+- `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive] [--with-tools]`: scaffold a project env.
+- `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
+- `shellenv activate [<env>] [--shell-type bash|zsh|fish]`: print an activation snippet to `eval`.
+- `shellenv exec [<env>] [--profile] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code).
+- `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
+- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (**placeholder installers today** — the version is recorded but not yet provisioned).
+- `shellenv doctor`: quick health check of the global home.
+
+## Environment variables
+- `SHELLENV_HOME`: global state root (default `~/.shellenv`).
+- `SHELLENV_PROFILES`: directory checked first when resolving a profile.
+- `SHELLENV_ACTIVE`: set to `1` inside an activated session or an `exec` child.
+- `SHELLENV_ENV_NAME`: the active env's name (handy for prompts and debugging).
 
 ## Docs
 - Contributor workflow and standards: `CONTRIBUTING.md`.
@@ -70,25 +123,8 @@ shellenv exec -- env | grep SHELLENV_ENV_NAME
 - Design decisions, rationale, and roadmap: `docs/DESIGN.md`.
 - Task notes and change log: `docs/Task.md`.
 
-## Common commands
-- `shellenv create [--name default] --shell <shell>@<ver> [--profile strict]`: scaffold a project env.
-- `shellenv activate [<env>] [--shell-type bash|zsh|fish]`: print activation snippet to `eval`.
-- `shellenv exec [<env>] [--profile] -- <cmd> [args]`: run a command without interactive activation; `HOME`/`TMPDIR`/`XDG_*` are redirected to a per-env sandbox, and `--profile` sources the env's profile (e.g. `strict`) first.
-- `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: choose, inspect, or remove project envs.
-- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (placeholder installers today).
-- `shellenv which <binary>`: resolve a tool inside the active env; `shellenv doctor`: quick health check.
-
-## Testing and dev notes
+## Testing & dev notes
 - Unit tests: `make test`.
 - Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`.
-- If your environment restricts writing to the default Go cache, run unit tests with a repo-local cache: `GOCACHE=$PWD/.cache/go-build go test ./...`.
+- If your environment restricts the default Go cache, use a repo-local one: `GOCACHE=$PWD/.cache/go-build go test ./...`.
 - Keep experiments isolated by pointing `SHELLENV_HOME` at a temp directory when hacking on the tool.
-
-## Example workflow
-```bash
-make build
-./dist/shellenv init
-./dist/shellenv create --shell bash@5.2 --profile strict
-eval "$(./dist/shellenv activate)"
-./dist/shellenv exec -- echo "hi from $SHELLENV_ENV_NAME"
-```
