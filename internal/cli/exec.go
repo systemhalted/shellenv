@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,12 +10,19 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/systemhalted/shellenv/internal/project"
+	"github.com/systemhalted/shellenv/internal/shell"
 )
 
-func init() { rootCmd.AddCommand(execCmd) }
+var execWithProfile bool
+
+func init() {
+	execCmd.Flags().BoolVar(&execWithProfile, "profile", false,
+		"source the env's declared profile (e.g. strict) before running the command")
+	rootCmd.AddCommand(execCmd)
+}
 
 var execCmd = &cobra.Command{
-	Use:   "exec [<env>] -- <cmd> [args...]",
+	Use:   "exec [<env>] [--profile] -- <cmd> [args...]",
 	Short: "Run a command within a project env without interactive activation",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,25 +63,110 @@ var execCmd = &cobra.Command{
 
 		binDir := filepath.Join(envDir, "bin")
 		childEnv := prependPath(os.Environ(), binDir)
-		childEnv = append(childEnv,
-			fmt.Sprintf("SHELLENV_ENV_NAME=%s", envName),
-			"SHELLENV_ACTIVE=1",
-		)
+		childEnv = upsertEnv(childEnv, "SHELLENV_ENV_NAME", envName)
+		childEnv = upsertEnv(childEnv, "SHELLENV_ACTIVE", "1")
 
-		cmdPath, err := resolveCommandPath(cmdArgs[0], childEnv)
-		if err != nil {
-			return err
+		// Isolate HOME/TMPDIR/XDG so scripts write to a per-env sandbox rather
+		// than the user's real home or system temp dir.
+		sandboxHome := project.SandboxHomeDir(cwd, envName)
+		tmpDir := filepath.Join(sandboxHome, "tmp")
+		xdgConfig := filepath.Join(sandboxHome, ".config")
+		xdgCache := filepath.Join(sandboxHome, ".cache")
+		xdgData := filepath.Join(sandboxHome, ".local", "share")
+		for _, d := range []string{sandboxHome, tmpDir, xdgConfig, xdgCache, xdgData} {
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				return err
+			}
 		}
+		childEnv = upsertEnv(childEnv, "HOME", sandboxHome)
+		childEnv = upsertEnv(childEnv, "TMPDIR", tmpDir)
+		childEnv = upsertEnv(childEnv, "XDG_CONFIG_HOME", xdgConfig)
+		childEnv = upsertEnv(childEnv, "XDG_CACHE_HOME", xdgCache)
+		childEnv = upsertEnv(childEnv, "XDG_DATA_HOME", xdgData)
 
-		child := exec.Command(cmdPath, cmdArgs[1:]...)
+		var child *exec.Cmd
+		if execWithProfile {
+			md, _ := project.ReadMetadata(cwd, envName)
+			profilePath, ok := shell.ResolveProfile(cwd, md.Profile)
+			if !ok {
+				return fmt.Errorf("profile %q not found for env %q (looked in SHELLENV_PROFILES, ./profiles, and beside the binary)", md.Profile, envName)
+			}
+			shellName := profileShell(md.Shell)
+			shellPath, err := resolveCommandPath(shellName, childEnv)
+			if err != nil {
+				return err
+			}
+			// Source the profile, then run the requested command *in* that shell
+			// (not exec) so the profile's options govern how this shell runs it.
+			// $0 is the shell name, so the command and its args become $1.. for
+			// "$@". Note: a command that re-invokes an interpreter (e.g. a script
+			// with its own shebang, or `bash -c`) starts fresh and only inherits
+			// the profile's exported environment, not its shell options.
+			script := ". " + singleQuote(profilePath) + "; \"$@\""
+			argv := append([]string{"-c", script, shellName}, cmdArgs...)
+			child = exec.Command(shellPath, argv...)
+		} else {
+			cmdPath, err := resolveCommandPath(cmdArgs[0], childEnv)
+			if err != nil {
+				return err
+			}
+			child = exec.Command(cmdPath, cmdArgs[1:]...)
+		}
 		child.Env = childEnv
 		child.Stdout = os.Stdout
 		child.Stderr = os.Stderr
 		child.Stdin = os.Stdin
 		child.Dir = cwd
 
-		return child.Run()
+		if err := child.Run(); err != nil {
+			var ee *exec.ExitError
+			if errors.As(err, &ee) {
+				code := ee.ExitCode()
+				if code < 0 {
+					code = 1 // terminated by signal; report a generic failure
+				}
+				return &exitError{code: code}
+			}
+			return err
+		}
+		return nil
 	},
+}
+
+// upsertEnv sets key=value in env, replacing any existing entry for key or
+// appending a new one. It mutates and returns the slice.
+func upsertEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	entry := prefix + value
+	for i, v := range env {
+		if strings.HasPrefix(v, prefix) {
+			env[i] = entry
+			return env
+		}
+	}
+	return append(env, entry)
+}
+
+// profileShell picks a POSIX-compatible interpreter to source a profile,
+// derived from the declared "<shell>@<version>" metadata. Profiles are
+// bash/POSIX scripts, so fish (and an unset shell) fall back to bash.
+func profileShell(declared string) string {
+	name := declared
+	if i := strings.IndexByte(name, '@'); i >= 0 {
+		name = name[:i]
+	}
+	switch name {
+	case "bash", "zsh", "sh":
+		return name
+	default:
+		return "bash"
+	}
+}
+
+// singleQuote wraps s in single quotes for safe interpolation into a shell -c
+// script, escaping any embedded single quotes.
+func singleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func prependPath(env []string, bin string) []string {
