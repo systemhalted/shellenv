@@ -9,8 +9,9 @@ Keep changes small, tested, and contained to avoid touching your real shell setu
 ## Build and test
 - Build: `make build` (produces `dist/shellenv`).
 - Unit tests: `make test` (or `GOCACHE=$PWD/.cache/go-build go test ./...`).
-- Integration tests (requires `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`.
+- Integration tests (requires `bats`): `make itest` (or `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`).
 - Use `./run.sh` as a smoke test; it builds, inits, creates, activates, and performs basic checks.
+- CI (GitHub Actions) runs gofmt/vet/unit tests/bats on every push and PR to `main`; a weekly `real-install` workflow exercises the real source-build installer.
 
 ## Coding style
 - Run `gofmt` on Go code; Go version 1.22.
