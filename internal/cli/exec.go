@@ -13,11 +13,16 @@ import (
 	"github.com/systemhalted/shellenv/internal/shell"
 )
 
-var execWithProfile bool
+var (
+	execWithProfile bool
+	execContainer   string
+)
 
 func init() {
 	execCmd.Flags().BoolVar(&execWithProfile, "profile", false,
 		"source the env's declared profile (e.g. strict) before running the command")
+	execCmd.Flags().StringVar(&execContainer, "container", "",
+		"run the command inside the specified container image (e.g., ubuntu:22.04)")
 	rootCmd.AddCommand(execCmd)
 }
 
@@ -85,7 +90,44 @@ var execCmd = &cobra.Command{
 		childEnv = upsertEnv(childEnv, "XDG_DATA_HOME", xdgData)
 
 		var child *exec.Cmd
-		if execWithProfile {
+		if execContainer != "" {
+			engine, err := findContainerEngine()
+			if err != nil {
+				return err
+			}
+			var containerArgs []string
+			containerArgs = append(containerArgs, "run", "--rm")
+			if isTTY(os.Stdin.Fd()) && isTTY(os.Stdout.Fd()) {
+				containerArgs = append(containerArgs, "-i", "-t")
+			} else {
+				containerArgs = append(containerArgs, "-i")
+			}
+			containerArgs = append(containerArgs, "-v", fmt.Sprintf("%s:%s", cwd, cwd))
+			containerArgs = append(containerArgs, "-w", cwd)
+			for _, envVar := range childEnv {
+				if strings.HasPrefix(envVar, "PATH=") {
+					continue
+				}
+				containerArgs = append(containerArgs, "-e", envVar)
+			}
+			containerArgs = append(containerArgs, execContainer)
+
+			var shellScript strings.Builder
+			shellScript.WriteString(fmt.Sprintf("export PATH=%s:$PATH; ", singleQuote(binDir)))
+			if execWithProfile {
+				md, _ := project.ReadMetadata(cwd, envName)
+				profilePath, ok := shell.ResolveProfile(cwd, md.Profile)
+				if !ok {
+					return fmt.Errorf("profile %q not found for env %q (looked in SHELLENV_PROFILES, ./profiles, and beside the binary)", md.Profile, envName)
+				}
+				shellScript.WriteString(fmt.Sprintf("[ -f %s ] && . %s; ", singleQuote(profilePath), singleQuote(profilePath)))
+			}
+			shellScript.WriteString(`exec "$@"`)
+
+			containerArgs = append(containerArgs, "sh", "-c", shellScript.String(), "--")
+			containerArgs = append(containerArgs, cmdArgs...)
+			child = exec.Command(engine, containerArgs...)
+		} else if execWithProfile {
 			md, _ := project.ReadMetadata(cwd, envName)
 			profilePath, ok := shell.ResolveProfile(cwd, md.Profile)
 			if !ok {
@@ -112,7 +154,9 @@ var execCmd = &cobra.Command{
 			}
 			child = exec.Command(cmdPath, cmdArgs[1:]...)
 		}
-		child.Env = childEnv
+		if execContainer == "" {
+			child.Env = childEnv
+		}
 		child.Stdout = os.Stdout
 		child.Stderr = os.Stderr
 		child.Stdin = os.Stdin
@@ -216,4 +260,13 @@ func isExecutable(path string) bool {
 		return false
 	}
 	return fi.Mode()&0o111 != 0
+}
+
+func findContainerEngine() (string, error) {
+	for _, engine := range []string{"docker", "podman"} {
+		if _, err := exec.LookPath(engine); err == nil {
+			return engine, nil
+		}
+	}
+	return "", fmt.Errorf("container engine not found (neither 'docker' nor 'podman' is on your PATH)")
 }

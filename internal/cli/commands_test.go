@@ -18,6 +18,7 @@ func resetCLIState() {
 	createProfile = "strict"
 	actShellType = ""
 	execWithProfile = false
+	execContainer = ""
 }
 
 func runCLI(t *testing.T, dir string, args ...string) (string, string, error) {

@@ -11,6 +11,7 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 2. **Scoped env vars**: `SHELLENV_ACTIVE=1` and `SHELLENV_ENV_NAME=<env>` are set in the child only — they never persist to the parent unless the user `eval`s the `activate` snippet.
 3. **Login shell untouched**: no `.bashrc`/`.zshrc`/`.profile` is read or written. Activation is opt-in (`eval "$(shellenv activate)"`) or one-off (`shellenv exec`).
 4. **Optional shell-option profiles**: `activate` may source a profile (`strict`/`posix`/`interactive`) to enforce shell options like `set -euo pipefail`.
+5. **Containerized execution option (`exec --container <image>`)**: when invoked, the command runs inside an isolated Docker/Podman container. The host workspace is mounted (`-v cwd:cwd`) and the working directory matches. The sandbox `$HOME` and `$TMPDIR` are passed as environment variables to keep file writes inside the host's sandbox folder, while providing the container's isolated network, filesystem, and process namespaces.
 
 ### What is and isn't isolated
 | Concern | Isolated? | Notes |
@@ -25,6 +26,9 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 | Network | **No** | No network namespace or filtering. |
 | Processes | **No** | No PID namespace; host processes are visible. |
 | File descriptors / UID | **No** | Child inherits FDs and runs as the same user. |
+
+> [!NOTE]
+> **Container Mode Isolation (`exec --container`):** When executing with the `--container <image>` flag, the sandboxed process runs inside a container namespace. Under this mode, filesystems (outside the workspace), network, processes, and file descriptors are fully isolated by the container runtime.
 
 ### Intended use vs. non-use
 - **Good for**: testing shell scripts against a declared shell/profile, catching portability issues, and iterating without polluting your real shell setup.
@@ -47,7 +51,7 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 - **init**: ensures `SHELLENV_HOME` exists, prints PATH instructions, writes `.initialized`.
 - **create**: writes `metadata.json` (name, shell, profile, tools placeholder) and ensures `bin/` exists under `./.shellenv/<env>`.
 - **activate**: picks an env (arg → `./.shellenv/current` → `default`), verifies it exists, resolves the profile (`SHELLENV_PROFILES` → `./profiles` → alongside the binary), and prints shell code that sets `SHELLENV_ACTIVE=1`, `SHELLENV_ENV_NAME`, prepends `bin/` to `PATH`, and prefixes the prompt. Fish activation skips profile sourcing.
-- **exec**: uses the same env selection as `activate`, builds a child env with `bin/` prepended and `SHELLENV_*` vars set, and additionally redirects `HOME`/`TMPDIR`/`XDG_*` to a per-env sandbox (`./.shellenv/<env>/home/`) so scripts don't write to the real home. With `--profile` it runs the command *inside* the declared shell after sourcing the env's profile, so the profile's exported environment and (for commands run directly by that shell) its options like `set -euo pipefail` apply; a command that re-invokes an interpreter (a script with its own shebang, or `bash -c …`) starts fresh and inherits only the exported environment. Without `--profile` it resolves the command path against the modified PATH and runs it directly. The child's exit code is propagated as shellenv's own exit code (Cobra's usage block is silenced so a non-zero child exit reads cleanly).
+- **exec**: uses the same env selection as `activate`, builds a child env with `bin/` prepended and `SHELLENV_*` vars set, and additionally redirects `HOME`/`TMPDIR`/`XDG_*` to a per-env sandbox (`./.shellenv/<env>/home/`) so scripts don't write to the real home. Under host execution (default), if `--profile` is used, it runs the command *inside* the declared shell after sourcing the env's profile. Under containerized execution (`--container <image>`), it detects the container CLI engine (`docker` or `podman`), mounts the workspace (`-v cwd:cwd`), aligns the working directory, forwards the sandboxed environment variables, and executes the target command wrapped in `sh -c` inside the container to prepend the sandbox `bin/` and source profiles if requested. The child's exit code is mirrored exactly as shellenv's own exit status.
 - **install/uninstall/versions**: placeholder runtime managers that create/remove directories under `$SHELLENV_HOME/installs/`.
 - **which**: resolves a binary preferring the env `bin/` folder.
 - **destroy/list**: remove or enumerate project envs under `./.shellenv`.

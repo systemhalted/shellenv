@@ -16,5 +16,6 @@
 - R2: added `exec --profile` (opt-in), which sources the env's declared profile through the declared shell (`profileShell`) before running the command.
 - Added exec tests for HOME/TMPDIR isolation and profile sourcing; updated ARCHITECTURE/DESIGN/README to match.
 - R2 polish: silenced Cobra's usage/duplicate-error dump (`SilenceUsage`/`SilenceErrors`); `exec` now propagates a child's real exit code via an `exitError` type instead of always exiting 1, and runtime errors print a single clean line.
+- Added `--container <image>` flag to `shellenv exec` to run commands inside Docker or Podman containers. Implemented TTY detection, volume mounts for the workspace, working directory mapping, environment variable forwarding, and entrypoint wrapping via `sh -c`. Added unit and integration tests, and updated documentation.
 
 Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.

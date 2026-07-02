@@ -23,4 +23,19 @@ setup() {
   run bash -lc 'cd proj && echo -e "#!/usr/bin/env bash\necho hi" > ./.shellenv/default/bin/hi && chmod +x ./.shellenv/default/bin/hi && '"$BIN"' exec -- hi'
   [ "$status" -eq 0 ]
   [[ "$output" =~ "hi" ]]
+  rm -rf proj
+}
+
+@test "exec with container" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+  which docker >/dev/null 2>&1 || skip "docker not found"
+
+  run bash -lc 'mkdir -p proj-container && cd proj-container && '"$BIN"' create --shell bash@5.2'
+  [ "$status" -eq 0 ]
+
+  run bash -lc 'cd proj-container && '"$BIN"' exec --container alpine -- echo "hello container"'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "hello container" ]]
+
+  rm -rf proj-container
 }

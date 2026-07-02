@@ -38,22 +38,24 @@ make build
 eval "$(./dist/shellenv activate)"                     # or activate your shell session
 ```
 
-## Two ways to run: `activate` vs `exec`
+## Two ways to run: `activate` vs `exec` (Host and Container Modes)
 Both put the env's `bin/` first on `PATH`. They differ in how far the isolation goes:
 
-| | `eval "$(shellenv activate)"` | `shellenv exec -- <cmd>` |
-| --- | --- | --- |
-| Prepends env `bin/` to `PATH` | yes | yes |
-| Sets `SHELLENV_ACTIVE` / `SHELLENV_ENV_NAME` | yes | yes |
-| Sandboxes `HOME` / `TMPDIR` / `XDG_*` | **no** (real `~`) | **yes** (`./.shellenv/<env>/home/`) |
-| Applies the declared profile | yes (bash/zsh/posix; fish skips) | only with `--profile` |
-| Changes your current shell session | yes (until you reset it) | no (subprocess only) |
-| Propagates a command's exit code | n/a | yes |
+| | `eval "$(shellenv activate)"` | `shellenv exec -- <cmd>` | `shellenv exec --container <image> -- <cmd>` |
+| --- | --- | --- | --- |
+| Prepends env `bin/` to `PATH` | yes | yes | yes (inside container) |
+| Sets `SHELLENV_*` variables | yes | yes | yes (inside container) |
+| Sandboxes `HOME` / `TMPDIR` | **no** (real `~`) | **yes** (`./.shellenv/<env>/home/`) | **yes** (mounted on container) |
+| Network / Process isolation | **no** | **no** | **yes** (container namespaces) |
+| System filesystem isolation | **no** | **no** | **yes** (container namespaces) |
+| Changes current shell session | yes (until you reset it) | no (subprocess only) | no (container execution) |
+| Propagates command exit code | n/a | yes | yes |
 
 - Use **`activate`** for an interactive session where you want the env's tools and profile in your prompt.
-- Use **`exec`** for one-off or scripted runs you want fully contained — including writes to `$HOME` and temp files, and a faithful exit code.
+- Use **`exec`** (Host Mode) for one-off or scripted runs you want local-user contained — including writes to `$HOME` and temp files.
+- Use **`exec --container <image>`** (Container Mode) for system-mutating scripts (like installation scripts) that need full filesystem, process, and network namespace isolation.
 
-For both, the env is chosen as: the name you pass → `./.shellenv/current` (set by `shellenv use`) → `default`.
+For all, the env is chosen as: the name you pass → `./.shellenv/current` (set by `shellenv use`) → `default`.
 
 ## Walkthrough: test a script in isolation
 This runs a script through `exec` and shows that its `$HOME` writes land in the sandbox (your real home is untouched) and that its exit code is propagated.
@@ -106,7 +108,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive] [--with-tools]`: scaffold a project env.
 - `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
 - `shellenv activate [<env>] [--shell-type bash|zsh|fish]`: print an activation snippet to `eval`.
-- `shellenv exec [<env>] [--profile] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code).
+- `shellenv exec [<env>] [--profile] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
 - `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (**placeholder installers today** — the version is recorded but not yet provisioned).
 - `shellenv doctor`: quick health check of the global home.

@@ -102,6 +102,12 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   more than auto-usage on bad args; revisit if users find arg errors unclear (e.g. by
   re-enabling usage only for `cobra`-level argument-validation failures).
 - **Status**: Current.
+ 
+## 10. Explicit Container Execution Driver (`--container <image>`)
+- **Decision**: Introduce an explicit container execution driver to allow running script commands inside a Docker or Podman container.
+- **Why**: Many scripts (like system setup wrappers) mutate global host resources (package manager installs, absolute directories outside home). These cannot be safely isolated via local PATH shimming alone. The container driver runs the command inside a clean container namespace with mounted workspaces and redirected sandbox folders.
+- **Trade-off**: Requires a container CLI (Docker or Podman) to be running on the host machine.
+- **Status**: Current.
 
 ---
 

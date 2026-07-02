@@ -237,3 +237,119 @@ func TestExecErrorsWhenCommandMissing(t *testing.T) {
 		t.Fatalf("expected missing command error, got %v", err)
 	}
 }
+
+func TestExecWithContainerCLI(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	mockBinDir := t.TempDir()
+	mockDocker := filepath.Join(mockBinDir, "docker")
+
+	argsOutput := filepath.Join(dir, "docker-args.txt")
+	scriptContent := fmt.Sprintf("#!/bin/sh\nfor arg in \"$@\"; do echo \"$arg\" >> %s; done\nexit 0\n", argsOutput)
+	if err := os.WriteFile(mockDocker, []byte(scriptContent), 0o755); err != nil {
+		t.Fatalf("write mock docker: %v", err)
+	}
+
+	oldPath := os.Getenv("PATH")
+	defer os.Setenv("PATH", oldPath)
+	os.Setenv("PATH", mockBinDir+string(os.PathListSeparator)+oldPath)
+
+	_, _, err := runCLI(t, dir, "exec", "--container", "alpine", "--", "echo", "hello")
+	if err != nil {
+		t.Fatalf("exec with container failed: %v", err)
+	}
+
+	data, err := os.ReadFile(argsOutput)
+	if err != nil {
+		t.Fatalf("read docker args output: %v", err)
+	}
+
+	args := strings.Split(strings.TrimSpace(string(data)), "\n")
+
+	if len(args) < 5 {
+		t.Fatalf("too few args passed to docker: %q", args)
+	}
+	if args[0] != "run" {
+		t.Errorf("expected 'run', got %s", args[0])
+	}
+
+	hasRm := false
+	hasVolume := false
+	hasWorkdir := false
+	hasImage := false
+	hasSh := false
+	hasEcho := false
+
+	for _, arg := range args {
+		if arg == "--rm" {
+			hasRm = true
+		}
+		if strings.HasPrefix(arg, "-v") || strings.Contains(arg, fmt.Sprintf("%s:%s", dir, dir)) {
+			hasVolume = true
+		}
+		if arg == dir {
+			hasWorkdir = true
+		}
+		if arg == "alpine" {
+			hasImage = true
+		}
+		if arg == "sh" {
+			hasSh = true
+		}
+		if arg == "echo" {
+			hasEcho = true
+		}
+	}
+
+	if !hasRm {
+		t.Errorf("missing --rm flag")
+	}
+	if !hasVolume {
+		t.Errorf("missing volume mount for %s", dir)
+	}
+	if !hasWorkdir {
+		t.Errorf("missing workdir or volume directory reference")
+	}
+	if !hasImage {
+		t.Errorf("missing container image 'alpine'")
+	}
+	if !hasSh {
+		t.Errorf("missing sh entry point wrapping")
+	}
+	if !hasEcho {
+		t.Errorf("missing execution command 'echo'")
+	}
+}
+
+func TestExecWithContainerExitCode(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	mockBinDir := t.TempDir()
+	mockDocker := filepath.Join(mockBinDir, "docker")
+
+	scriptContent := "#!/bin/sh\nexit 123\n"
+	if err := os.WriteFile(mockDocker, []byte(scriptContent), 0o755); err != nil {
+		t.Fatalf("write mock docker: %v", err)
+	}
+
+	oldPath := os.Getenv("PATH")
+	defer os.Setenv("PATH", oldPath)
+	os.Setenv("PATH", mockBinDir+string(os.PathListSeparator)+oldPath)
+
+	_, _, err := runCLI(t, dir, "exec", "--container", "alpine", "--", "echo")
+	var ee *exitError
+	if !errors.As(err, &ee) {
+		t.Fatalf("expected *exitError, got %v", err)
+	}
+	if ee.code != 123 {
+		t.Fatalf("expected exit code 123, got %d", ee.code)
+	}
+}
