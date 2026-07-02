@@ -3,17 +3,17 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/systemhalted/shellenv/internal/env"
+	"github.com/systemhalted/shellenv/internal/installer"
 )
 
 func init() { rootCmd.AddCommand(installCmd) }
 
 var installCmd = &cobra.Command{
 	Use:   "install <shell>@<version>",
-	Short: "Install (or declare) a shell runtime version (placeholder)",
+	Short: "Download, build, and install a shell runtime from source",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pair := args[0]
@@ -21,18 +21,15 @@ var installCmd = &cobra.Command{
 		if !ok {
 			return fmt.Errorf("expected <shell>@<version>, got %q", pair)
 		}
-		inst, err := env.InstallsDir()
+		home, err := env.EnsureHome()
 		if err != nil {
 			return err
 		}
-		dir := filepath.Join(inst, name, version, "bin")
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		prefix, err := installer.New(home, os.Stdout).Install(name, version)
+		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "installed.txt"), []byte("placeholder runtime\n"), 0o644); err != nil {
-			return err
-		}
-		fmt.Printf("Installed %s@%s into %s (placeholder)\n", name, version, filepath.Dir(dir))
+		fmt.Printf("Installed %s@%s into %s\n", name, version, prefix)
 		return nil
 	},
 }

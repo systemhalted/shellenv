@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/systemhalted/shellenv/internal/env"
@@ -21,6 +23,22 @@ var doctorCmd = &cobra.Command{
 		fmt.Printf("Home:  %s\n", h)
 		if fi, err := os.Stat(h); err == nil && (fi.Mode()&0o002) != 0 {
 			fmt.Println("Warning: home dir is world-writable; consider chmod 755 or 700")
+		}
+		var missing []string
+		if _, err := exec.LookPath("cc"); err != nil {
+			if _, err := exec.LookPath("gcc"); err != nil {
+				missing = append(missing, "cc/gcc")
+			}
+		}
+		for _, tool := range []string{"make", "tar"} {
+			if _, err := exec.LookPath(tool); err != nil {
+				missing = append(missing, tool)
+			}
+		}
+		if len(missing) > 0 {
+			fmt.Printf("Build toolchain: missing %s (needed by 'shellenv install')\n", strings.Join(missing, ", "))
+		} else {
+			fmt.Println("Build toolchain: ok")
 		}
 		fmt.Println("OK")
 		return nil

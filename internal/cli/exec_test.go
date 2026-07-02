@@ -261,9 +261,6 @@ func TestExecPrependsInstalledRuntimeBin(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("SHELLENV_HOME", home)
 
-	if _, _, err := runCLI(t, dir, "install", "bash@5.2"); err != nil {
-		t.Fatalf("install returned error: %v", err)
-	}
 	output := filepath.Join(dir, "out.txt")
 	installRuntimeTool(t, home, "bash", "5.2", "pinnedtool",
 		fmt.Sprintf("#!/bin/sh\necho pinned > %q\n", output))

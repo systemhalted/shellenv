@@ -83,7 +83,7 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   ship and be exercised first.
 - **Trade-off**: The headline "declare and pin a shell version" promise isn't fully real yet —
   the declared version is recorded but never resolved.
-- **Status**: Roadmap (item R5 below).
+- **Status**: Superseded by decision 13 (R5): `install` now builds real runtimes from source.
 
 ## 9. Silence Cobra's usage/error output; report errors centrally
 - **Decision**: Set `SilenceUsage` and `SilenceErrors` on the root command, print the error
@@ -138,6 +138,29 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   git revert away; the decision record stays so the context isn't lost.
 - **Status**: Current.
 
+## 13. Real installers: build from official source tarballs (`internal/installer`)
+- **Decision**: `shellenv install <shell>@<version>` downloads the official source tarball
+  (bash from `ftp.gnu.org`, zsh from the SourceForge mirror — `zsh.org/pub` 404s for direct
+  tarball URLs), verifies it against a SHA-256 pinned in the binary for well-known versions
+  (`bash@5.2`, `zsh@5.9`; computed from the upstream artifacts), then runs
+  `./configure --prefix=$SHELLENV_HOME/installs/<shell>/<version>` + `make -j<cpus>` +
+  `make install`. Downloads cache under `$SHELLENV_HOME/cache/`; builds happen in
+  `$SHELLENV_HOME/tmp/build-<shell>-<version>/` with full output in `build.log` (kept on
+  failure, removed on success). A preflight requires `cc`/`gcc`, `make`, and `tar` and fails
+  with an actionable message; `doctor` reports the same toolchain status. Unsupported shells
+  error clearly (supported: bash, zsh). Already-installed runtimes are no-ops.
+- **Why**: Building from upstream source is the pyenv model this tool emulates and the only
+  trustworthy universal channel — there is no official prebuilt-binary distribution for
+  bash/zsh on Linux, and third-party static builds are a supply-chain risk. Extraction shells
+  out to system `tar` (handles gz and xz) to avoid growing the dependency tree.
+- **Trade-off**: Installs need network, a compiler toolchain, and minutes of build time —
+  paid once per version. Versions without a pinned checksum install with a loud warning
+  rather than failing, mirroring the warn-don't-break stance of decision 11; a mismatch
+  against a pinned checksum always fails and removes the corrupt download. Real builds are
+  exercised by an opt-in bats test (`SHELLENV_TEST_REAL_INSTALL=1`); the default suites stub
+  the network and toolchain.
+- **Status**: Current.
+
 ---
 
 # Roadmap (gap-closing)
@@ -163,14 +186,15 @@ high-value, and directly serve "don't impact the host."
   keep winning). A declared-but-missing runtime warns on stderr and falls back to the system
   shell; `--strict-shell` (on both commands) turns that into a hard error (see decision 11).
   Host-only: `--container` skips resolution, and combining it with `--strict-shell` errors.
-  Remaining: until R5 lands, installed runtimes are placeholder dirs, so pinning is only as
-  real as what you put in the installs bin.
+  With R5 done, `shellenv install` provisions real runtimes for pinning.
 - **R4 (P1) — Use or remove `shims/`. _Done (removed)._** Dropped the unused directory,
   `env.ShimsDir()`, `init`'s rc-file PATH hint, and `doctor`'s shims line (see decision 12).
   R3's per-env PATH pinning supersedes the global-shims model; trivially reversible via git
   if R5 ever wants shims back.
-- **R5 (P2, large) — Real runtime installers.** Replace placeholder `install.go` with actual
-  download/build of pinned shell versions.
+- **R5 (P2, large) — Real runtime installers. _Done._** `install` builds bash/zsh from
+  official source tarballs via `internal/installer` (download → SHA-256 verify → configure/
+  make/make install; see decision 13). Verified end-to-end: a from-source bash 5.2 build,
+  pinned and executed through `exec`.
 - **R6 (P2) — Fish profiles, cleanup, robustness. _Done._** Fish activation now sources a
   fish-syntax profile variant (`<profile>.fish`, resolved via `ResolveProfileForShell`; no
   fallback to `.sh` since fish can't source POSIX scripts — built-ins shipped in

@@ -13,8 +13,9 @@ setup() {
 @test "create + activate + exec" {
   [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
 
-  run bash -lc ''"$BIN"' install bash@5.2'
-  [ "$status" -eq 0 ]
+  # Pre-create the runtime dir so activate/exec see bash@5.2 as installed
+  # without a real (multi-minute) source build.
+  mkdir -p "$SHELLENV_HOME/installs/bash/5.2/bin"
 
   run bash -lc 'mkdir -p proj && cd proj && '"$BIN"' create --shell bash@5.2 --profile strict'
   [ "$status" -eq 0 ]
@@ -71,6 +72,18 @@ setup() {
   [ "$output" = "clean" ]
 
   rm -rf proj-eph
+}
+
+@test "install builds a real bash from source (opt-in)" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+  [ -n "${SHELLENV_TEST_REAL_INSTALL:-}" ] || skip "set SHELLENV_TEST_REAL_INSTALL=1 to run the real source build (network + several minutes)"
+
+  run bash -lc ''"$BIN"' install bash@5.2'
+  [ "$status" -eq 0 ]
+
+  run "$SHELLENV_HOME/installs/bash/5.2/bin/bash" -c 'echo "$BASH_VERSION"'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ ^5\.2 ]]
 }
 
 @test "exec with container" {

@@ -105,7 +105,9 @@ shellenv exec --strict-shell -- ./run-tests.sh
 # error: declared shell "bash@5.2" is not installed (run 'shellenv install bash@5.2', or omit --strict-shell)
 ```
 
-**Caveats:** installers are placeholders today, so `shellenv install` creates the runtime's `bin/` directory but doesn't download a shell — pinning takes effect for whatever you place there. Resolution is host-only: `exec --container` skips it (pick an image that provides the shell) and rejects `--strict-shell`.
+`shellenv install` builds the runtime from the official source tarball: it downloads into `$SHELLENV_HOME/cache/`, verifies the SHA-256 for pinned versions (`bash@5.2`, `zsh@5.9` — other versions install with an unverified-download warning), and runs `configure`/`make`/`make install` (a few minutes, once per version; build output lands in a `build.log` if anything fails). This needs `cc`/`gcc`, `make`, and `tar` — run `shellenv doctor` to check. Supported today: **bash** and **zsh**.
+
+**Caveat:** resolution is host-only — `exec --container` skips it (pick an image that provides the shell) and rejects `--strict-shell`.
 
 ## Exit codes & CI
 `shellenv exec` exits with the command's exact status (e.g. `exit 5` above), so it composes cleanly with `set -e` and CI pipelines. Runtime failures print a single clean line rather than a usage dump:
@@ -121,7 +123,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell]`: print an activation snippet to `eval`.
 - `shellenv exec [<env>] [--profile] [--strict-shell] [--ephemeral] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). `--ephemeral` swaps the persistent sandbox home for a throwaway one deleted after the run. If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
-- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (**placeholder installers today** — the runtime's `bin/` is created and used for PATH pinning, but no shell is downloaded).
+- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`), remove one, or list what's installed.
 - `shellenv doctor`: quick health check of the global home.
 
 ## Environment variables
@@ -138,6 +140,6 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 
 ## Testing & dev notes
 - Unit tests: `make test`.
-- Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`.
+- Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`. The real-source-build test is skipped unless `SHELLENV_TEST_REAL_INSTALL=1` is set (network + several minutes).
 - If your environment restricts the default Go cache, use a repo-local one: `GOCACHE=$PWD/.cache/go-build go test ./...`.
 - Keep experiments isolated by pointing `SHELLENV_HOME` at a temp directory when hacking on the tool.

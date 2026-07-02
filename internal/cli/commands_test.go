@@ -115,29 +115,35 @@ func TestInstallValidatesInput(t *testing.T) {
 	}
 }
 
-func TestInstallCreatesPlaceholderRuntime(t *testing.T) {
+func TestInstallRejectsUnsupportedShell(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	_, _, err := runCLI(t, "", "install", "fish@3.7")
+	if err == nil || !strings.Contains(err.Error(), "no installer for shell") {
+		t.Fatalf("expected unsupported-shell error, got %v", err)
+	}
+}
+
+func TestInstallSkipsAlreadyInstalledRuntime(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("SHELLENV_HOME", home)
+
+	// A runtime whose bin/<shell> exists is treated as installed; no
+	// download or build is attempted (so this test needs no network).
+	binDir := filepath.Join(home, "installs", "bash", "5.2", "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(binDir, "bash"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write fake bash: %v", err)
+	}
 
 	stdout, stderr, err := runCLI(t, "", "install", "bash@5.2")
 	if err != nil {
 		t.Fatalf("install returned error: %v (stderr: %s)", err, stderr)
 	}
-
-	binDir := filepath.Join(home, "installs", "bash", "5.2", "bin")
-	if _, err := os.Stat(binDir); err != nil {
-		t.Fatalf("expected bin dir: %v", err)
-	}
-	marker := filepath.Join(home, "installs", "bash", "5.2", "installed.txt")
-	data, err := os.ReadFile(marker)
-	if err != nil {
-		t.Fatalf("expected installed marker: %v", err)
-	}
-	if !strings.Contains(string(data), "placeholder runtime") {
-		t.Fatalf("unexpected marker contents: %q", data)
-	}
-	if !strings.Contains(stdout, "Installed bash@5.2") {
-		t.Fatalf("unexpected install output: %s", stdout)
+	if !strings.Contains(stdout, "already installed") {
+		t.Fatalf("expected already-installed message, got: %s", stdout)
 	}
 }
 
@@ -415,8 +421,9 @@ func TestActivateIncludesRuntimeBinWhenInstalled(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("SHELLENV_HOME", home)
 
-	if _, _, err := runCLI(t, dir, "install", "bash@5.2"); err != nil {
-		t.Fatalf("install returned error: %v", err)
+	runtimeBinDir := filepath.Join(home, "installs", "bash", "5.2", "bin")
+	if err := os.MkdirAll(runtimeBinDir, 0o755); err != nil {
+		t.Fatalf("mkdir runtime bin: %v", err)
 	}
 	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
 		t.Fatalf("create returned error: %v", err)
@@ -582,5 +589,9 @@ func TestDoctorWarnsOnWorldWritable(t *testing.T) {
 	}
 	if strings.Contains(stdout, "Shims") {
 		t.Fatalf("doctor should no longer report shims, got: %s", stdout)
+	}
+	// Installers build from source, so doctor reports the toolchain state.
+	if !strings.Contains(stdout, "Build toolchain") {
+		t.Fatalf("doctor should report build toolchain status, got: %s", stdout)
 	}
 }
