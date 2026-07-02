@@ -160,7 +160,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 
 ## Command reference
 - `shellenv init`: create the global home.
-- `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive] [--with-tools]`: scaffold a project env.
+- `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive]`: scaffold a project env.
 - `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
 - `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell] [--isolate-home]`: print an activation snippet to `eval`; `--isolate-home` also redirects `HOME`/`TMPDIR`/`XDG_*` to the env sandbox.
 - `shellenv deactivate [--shell-type bash|zsh|fish]`: print a snippet restoring the session (PATH, prompt, isolated vars, `SHELLENV_*`).

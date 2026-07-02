@@ -10,10 +10,9 @@ import (
 )
 
 var (
-	createName      string
-	createShell     string
-	createWithTools bool
-	createProfile   string
+	createName    string
+	createShell   string
+	createProfile string
 )
 
 func init() {
@@ -32,12 +31,6 @@ func init() {
 				Name:    createName,
 				Shell:   createShell,
 				Profile: createProfile,
-				Tools: func() []string {
-					if createWithTools {
-						return []string{"busybox@placeholder"}
-					}
-					return nil
-				}(),
 			}
 			if err := project.WriteMetadata(cwd, md); err != nil {
 				return err
@@ -49,7 +42,6 @@ func init() {
 	}
 	c.Flags().StringVar(&createName, "name", "", "name of the environment (default: default)")
 	c.Flags().StringVar(&createShell, "shell", "", "shell runtime to use, e.g., bash@5.2 (required)")
-	c.Flags().BoolVar(&createWithTools, "with-tools", false, "include a minimal toolset (placeholder)")
 	c.Flags().StringVar(&createProfile, "profile", "strict", "option profile: strict|posix|interactive")
 	rootCmd.AddCommand(c)
 }

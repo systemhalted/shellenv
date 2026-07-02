@@ -7,7 +7,27 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/systemhalted/shellenv/internal/env"
+	"github.com/systemhalted/shellenv/internal/project"
 )
+
+// warnDeclaringEnvs is a best-effort check that envs in the current
+// directory's project don't still pin the removed runtime. shellenv keeps no
+// registry of projects, so envs elsewhere on disk are invisible to this.
+func warnDeclaringEnvs(pair string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	names, err := project.ListEnvs(cwd)
+	if err != nil {
+		return
+	}
+	for _, n := range names {
+		if md, err := project.ReadMetadata(cwd, n); err == nil && md.Shell == pair {
+			fmt.Fprintf(os.Stderr, "warning: env %q in this directory still declares %s\n", n, pair)
+		}
+	}
+}
 
 func init() { rootCmd.AddCommand(uninstallCmd) }
 
@@ -29,6 +49,7 @@ var uninstallCmd = &cobra.Command{
 		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
+		warnDeclaringEnvs(pair)
 		fmt.Printf("Uninstalled %s@%s\n", name, version)
 		return nil
 	},

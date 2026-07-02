@@ -14,7 +14,6 @@ import (
 func resetCLIState() {
 	createName = ""
 	createShell = ""
-	createWithTools = false
 	createProfile = "strict"
 	actShellType = ""
 	actStrictShell = false
@@ -173,6 +172,49 @@ func TestUninstallValidatesInput(t *testing.T) {
 	}
 }
 
+func TestUninstallWarnsWhenEnvStillDeclares(t *testing.T) {
+	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "zsh@5.9"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+	target := filepath.Join(home, "installs", "zsh", "5.9")
+	if err := os.MkdirAll(filepath.Join(target, "bin"), 0o755); err != nil {
+		t.Fatalf("mkdir runtime: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "uninstall", "zsh@5.9")
+	if err != nil {
+		t.Fatalf("uninstall returned error: %v", err)
+	}
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Fatalf("runtime should still be removed, stat err=%v", statErr)
+	}
+	if !strings.Contains(stderr, "zsh@5.9") || !strings.Contains(stderr, "still declares") {
+		t.Fatalf("expected in-use warning naming the env, got: %s", stderr)
+	}
+}
+
+func TestUninstallSilentWhenNoEnvDeclares(t *testing.T) {
+	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+
+	if err := os.MkdirAll(filepath.Join(home, "installs", "zsh", "5.9", "bin"), 0o755); err != nil {
+		t.Fatalf("mkdir runtime: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "uninstall", "zsh@5.9")
+	if err != nil {
+		t.Fatalf("uninstall returned error: %v", err)
+	}
+	if strings.Contains(stderr, "still declares") {
+		t.Fatalf("expected no warning without declaring envs, got: %s", stderr)
+	}
+}
+
 func TestUninstallRemovesRuntime(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("SHELLENV_HOME", home)
@@ -249,7 +291,7 @@ func TestCreateRequiresShellFlag(t *testing.T) {
 func TestCreateWritesMetadataAndActivate(t *testing.T) {
 	dir := t.TempDir()
 
-	stdout, stderr, err := runCLI(t, dir, "create", "--name", "demo", "--shell", "bash@5.2", "--profile", "interactive", "--with-tools")
+	stdout, stderr, err := runCLI(t, dir, "create", "--name", "demo", "--shell", "bash@5.2", "--profile", "interactive")
 	if err != nil {
 		t.Fatalf("create returned error: %v (stderr: %s)", err, stderr)
 	}
@@ -261,8 +303,8 @@ func TestCreateWritesMetadataAndActivate(t *testing.T) {
 	if md.Name != "demo" || md.Shell != "bash@5.2" || md.Profile != "interactive" {
 		t.Fatalf("unexpected metadata: %+v", md)
 	}
-	if len(md.Tools) != 1 || md.Tools[0] != "busybox@placeholder" {
-		t.Fatalf("expected placeholder tools, got %v", md.Tools)
+	if len(md.Tools) != 0 {
+		t.Fatalf("expected no tools, got %v", md.Tools)
 	}
 	if md.Created == "" {
 		t.Fatalf("expected Created timestamp to be set")
