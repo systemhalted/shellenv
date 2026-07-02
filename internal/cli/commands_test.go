@@ -18,6 +18,8 @@ func resetCLIState() {
 	createProfile = "strict"
 	actShellType = ""
 	actStrictShell = false
+	actIsolateHome = false
+	deactShellType = ""
 	execWithProfile = false
 	execContainer = ""
 	execStrictShell = false
@@ -535,13 +537,72 @@ func TestActivateStdoutNeverOverridesHomeOrTmp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("activate returned error: %v", err)
 	}
-	// activate's contract: the eval'd snippet adjusts PATH/prompt/SHELLENV_*
-	// only — it must never redirect HOME/TMPDIR/XDG_* in the user's live
-	// shell (that isolation belongs to exec).
+	// Default activation's contract: the eval'd snippet adjusts
+	// PATH/prompt/SHELLENV_* only — redirecting HOME/TMPDIR/XDG_* in the
+	// user's live shell is opt-in via --isolate-home.
 	for _, forbidden := range []string{"HOME=", "TMPDIR=", "XDG_"} {
 		if strings.Contains(stdout, forbidden) {
 			t.Fatalf("activation snippet must not set %s, got: %s", forbidden, stdout)
 		}
+	}
+}
+
+func TestActivateIsolateHomeEmitsSandboxExports(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	stdout, stderr, err := runCLI(t, dir, "activate", "--isolate-home", "--shell-type", "bash")
+	if err != nil {
+		t.Fatalf("activate --isolate-home returned error: %v (stderr: %s)", err, stderr)
+	}
+	sandbox := project.SandboxHomeDir(dir, "default")
+	if !strings.Contains(stdout, "export HOME="+sandbox) {
+		t.Fatalf("expected HOME redirect to %s, got: %s", sandbox, stdout)
+	}
+	if strings.Contains(stdout, "warning") || strings.Contains(stdout, "deactivate") {
+		t.Fatalf("hint text must not reach eval'd stdout, got: %s", stdout)
+	}
+	// The CLI pre-creates the sandbox dirs (the snippet has no mkdir).
+	for _, d := range []string{sandbox, filepath.Join(sandbox, "tmp"), filepath.Join(sandbox, ".config")} {
+		if fi, statErr := os.Stat(d); statErr != nil || !fi.IsDir() {
+			t.Fatalf("sandbox dir %s not pre-created: %v", d, statErr)
+		}
+	}
+	// The restore hint goes to stderr.
+	if !strings.Contains(stderr, "deactivate") {
+		t.Fatalf("expected deactivate hint on stderr, got: %s", stderr)
+	}
+}
+
+func TestDeactivateStdoutPureShellCode(t *testing.T) {
+	dir := t.TempDir()
+
+	// deactivate needs no env, no .shellenv, and must never fail.
+	stdout, stderr, err := runCLI(t, dir, "deactivate", "--shell-type", "bash")
+	if err != nil {
+		t.Fatalf("deactivate returned error: %v", err)
+	}
+	if !strings.Contains(stdout, "SHELLENV_OLD_PATH") || !strings.Contains(stdout, "unset SHELLENV_ACTIVE") {
+		t.Fatalf("unexpected deactivate snippet: %s", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("deactivate must not write to stderr, got: %s", stderr)
+	}
+}
+
+func TestDeactivateFishVariant(t *testing.T) {
+	dir := t.TempDir()
+
+	stdout, _, err := runCLI(t, dir, "deactivate", "--shell-type", "fish")
+	if err != nil {
+		t.Fatalf("deactivate returned error: %v", err)
+	}
+	if !strings.Contains(stdout, "set -e SHELLENV_ACTIVE") {
+		t.Fatalf("expected fish unset syntax, got: %s", stdout)
 	}
 }
 

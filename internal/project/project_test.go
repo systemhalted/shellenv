@@ -27,6 +27,32 @@ func TestWriteAndReadMetadata(t *testing.T) {
 	}
 }
 
+func TestSandboxLayoutAndEnsureDirs(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+
+	sb := SandboxLayout(home)
+	if sb.Home != home ||
+		sb.Tmp != filepath.Join(home, "tmp") ||
+		sb.XDGConfig != filepath.Join(home, ".config") ||
+		sb.XDGCache != filepath.Join(home, ".cache") ||
+		sb.XDGData != filepath.Join(home, ".local", "share") {
+		t.Fatalf("unexpected layout: %+v", sb)
+	}
+
+	got, err := EnsureSandboxDirs(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != sb {
+		t.Fatalf("EnsureSandboxDirs = %+v, want %+v", got, sb)
+	}
+	for _, d := range []string{sb.Home, sb.Tmp, sb.XDGConfig, sb.XDGCache, sb.XDGData} {
+		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
+			t.Fatalf("dir %s not created: %v", d, err)
+		}
+	}
+}
+
 func TestListEnvs(t *testing.T) {
 	cwd := t.TempDir()
 	// empty is fine

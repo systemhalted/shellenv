@@ -74,6 +74,27 @@ setup() {
   rm -rf proj-eph
 }
 
+@test "activate --isolate-home + deactivate round-trip" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+
+  run bash -lc 'mkdir -p proj-iso && cd proj-iso && '"$BIN"' create --shell bash@9.9'
+  [ "$status" -eq 0 ]
+
+  run bash -c 'cd proj-iso
+    orig_home="$HOME"
+    eval "$('"$BIN"' activate --isolate-home 2>/dev/null)"
+    touch "$HOME/iso-marker"
+    [ -f ./.shellenv/default/home/iso-marker ] || { echo "marker not in sandbox"; exit 1; }
+    eval "$('"$BIN"' deactivate)"
+    [ "$HOME" = "$orig_home" ] || { echo "HOME not restored"; exit 1; }
+    [ -z "${SHELLENV_ACTIVE-}" ] || { echo "SHELLENV_ACTIVE leaked"; exit 1; }
+    echo iso-ok'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "iso-ok" ]]
+
+  rm -rf proj-iso
+}
+
 @test "install builds a real bash from source (opt-in)" {
   [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
   [ -n "${SHELLENV_TEST_REAL_INSTALL:-}" ] || skip "set SHELLENV_TEST_REAL_INSTALL=1 to run the real source build (network + several minutes)"

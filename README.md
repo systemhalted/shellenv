@@ -60,7 +60,7 @@ Both put the env's `bin/` first on `PATH`. They differ in how far the isolation 
 | --- | --- | --- | --- |
 | Prepends env `bin/` to `PATH` | yes | yes | yes (inside container) |
 | Sets `SHELLENV_*` variables | yes | yes | yes (inside container) |
-| Sandboxes `HOME` / `TMPDIR` | **no** (real `~`) | **yes** (`./.shellenv/<env>/home/`) | **yes** (mounted on container) |
+| Sandboxes `HOME` / `TMPDIR` | opt-in (`--isolate-home`) | **yes** (`./.shellenv/<env>/home/`) | **yes** (mounted on container) |
 | Network / Process isolation | **no** | **no** | **yes** (container namespaces) |
 | System filesystem isolation | **no** | **no** | **yes** (container namespaces) |
 | Changes current shell session | yes (until you reset it) | no (subprocess only) | no (container execution) |
@@ -73,6 +73,19 @@ Both put the env's `bin/` first on `PATH`. They differ in how far the isolation 
 For all, the env is chosen as: the name you pass → `./.shellenv/current` (set by `shellenv use`) → `default`.
 
 **Fish users:** the activation syntax differs — pipe instead of `eval`: `shellenv activate --shell-type fish | source`. Fish sessions source the profile's `.fish` variant (see [Concepts](#concepts)).
+
+## Isolating an interactive session, and `deactivate`
+By default an activated session keeps your real `~` (only `exec` sandboxes writes). If you want the interactive session sandboxed too, opt in:
+
+```bash
+eval "$(shellenv activate --isolate-home)"   # HOME/TMPDIR/XDG_* now point at ./.shellenv/<env>/home/
+...
+eval "$(shellenv deactivate)"                # restores PATH, prompt, HOME/TMPDIR/XDG_*, unsets SHELLENV_*
+```
+
+`deactivate` works after any activation (with or without `--isolate-home`) and is a silent no-op when nothing is active. Restoration is snapshot-based: activation saves the original values once, so even after activating twice you return to the pre-first-activation state; PATH edits you made *during* the session are not preserved.
+
+**Why opt-in:** redirecting `HOME` mid-session affects everything in that shell — prompt frameworks re-reading `~/.config`, `ssh`/`git` suddenly not finding `~/.ssh`/`~/.gitconfig`, agents keyed on your real home. Use it for focused testing sessions, not your daily driver shell. Also note shell *options* set by a sourced profile (`set -e`, `set -o posix`) can't be restored by `deactivate` — only environment and prompt are.
 
 ## Walkthrough: test a script in isolation
 This runs a script through `exec` and shows that its `$HOME` writes land in the sandbox (your real home is untouched) and that its exit code is propagated.
@@ -149,7 +162,8 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - `shellenv init`: create the global home.
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive] [--with-tools]`: scaffold a project env.
 - `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
-- `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell]`: print an activation snippet to `eval`.
+- `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell] [--isolate-home]`: print an activation snippet to `eval`; `--isolate-home` also redirects `HOME`/`TMPDIR`/`XDG_*` to the env sandbox.
+- `shellenv deactivate [--shell-type bash|zsh|fish]`: print a snippet restoring the session (PATH, prompt, isolated vars, `SHELLENV_*`).
 - `shellenv exec [<env>] [--profile] [--strict-shell] [--ephemeral] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). `--ephemeral` swaps the persistent sandbox home for a throwaway one deleted after the run. If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
 - `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`), remove one, or list what's installed.

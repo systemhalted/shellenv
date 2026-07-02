@@ -123,20 +123,15 @@ var execCmd = &cobra.Command{
 			defer os.RemoveAll(eph)
 			sandboxHome = eph
 		}
-		tmpDir := filepath.Join(sandboxHome, "tmp")
-		xdgConfig := filepath.Join(sandboxHome, ".config")
-		xdgCache := filepath.Join(sandboxHome, ".cache")
-		xdgData := filepath.Join(sandboxHome, ".local", "share")
-		for _, d := range []string{sandboxHome, tmpDir, xdgConfig, xdgCache, xdgData} {
-			if err := os.MkdirAll(d, 0o755); err != nil {
-				return err
-			}
+		sb, err := project.EnsureSandboxDirs(sandboxHome)
+		if err != nil {
+			return err
 		}
-		childEnv = upsertEnv(childEnv, "HOME", sandboxHome)
-		childEnv = upsertEnv(childEnv, "TMPDIR", tmpDir)
-		childEnv = upsertEnv(childEnv, "XDG_CONFIG_HOME", xdgConfig)
-		childEnv = upsertEnv(childEnv, "XDG_CACHE_HOME", xdgCache)
-		childEnv = upsertEnv(childEnv, "XDG_DATA_HOME", xdgData)
+		childEnv = upsertEnv(childEnv, "HOME", sb.Home)
+		childEnv = upsertEnv(childEnv, "TMPDIR", sb.Tmp)
+		childEnv = upsertEnv(childEnv, "XDG_CONFIG_HOME", sb.XDGConfig)
+		childEnv = upsertEnv(childEnv, "XDG_CACHE_HOME", sb.XDGCache)
+		childEnv = upsertEnv(childEnv, "XDG_DATA_HOME", sb.XDGData)
 
 		var child *exec.Cmd
 		if execContainer != "" {

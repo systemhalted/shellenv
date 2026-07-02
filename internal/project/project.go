@@ -28,6 +28,39 @@ func SandboxHomeDir(cwd, name string) string {
 	return filepath.Join(EnvDir(cwd, name), "home")
 }
 
+// SandboxPaths is the layout of an isolation sandbox rooted at a home dir;
+// exec's child env and activate --isolate-home both point HOME/TMPDIR/XDG_*
+// at these locations.
+type SandboxPaths struct {
+	Home      string
+	Tmp       string
+	XDGConfig string
+	XDGCache  string
+	XDGData   string
+}
+
+// SandboxLayout maps a sandbox home dir to its full path layout.
+func SandboxLayout(home string) SandboxPaths {
+	return SandboxPaths{
+		Home:      home,
+		Tmp:       filepath.Join(home, "tmp"),
+		XDGConfig: filepath.Join(home, ".config"),
+		XDGCache:  filepath.Join(home, ".cache"),
+		XDGData:   filepath.Join(home, ".local", "share"),
+	}
+}
+
+// EnsureSandboxDirs creates the sandbox layout rooted at home.
+func EnsureSandboxDirs(home string) (SandboxPaths, error) {
+	sb := SandboxLayout(home)
+	for _, d := range []string{sb.Home, sb.Tmp, sb.XDGConfig, sb.XDGCache, sb.XDGData} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			return SandboxPaths{}, err
+		}
+	}
+	return sb, nil
+}
+
 func WriteMetadata(cwd string, md Metadata) error {
 	dir := EnvDir(cwd, md.Name)
 	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {

@@ -13,6 +13,7 @@ import (
 var (
 	actShellType   string
 	actStrictShell bool
+	actIsolateHome bool
 )
 
 func init() {
@@ -72,10 +73,22 @@ func init() {
 				}
 			}
 
-			code := shell.ActivationCodeWithOptions(shellType, pdir, name, shell.ActivationOptions{
+			opts := shell.ActivationOptions{
 				ProfilePath:   profilePath,
 				RuntimeBinDir: runtimeBin,
-			})
+			}
+			if actIsolateHome {
+				// Pre-create the sandbox here so stdout stays pure shell
+				// code and a mkdir failure surfaces as a normal error.
+				sb, err := project.EnsureSandboxDirs(project.SandboxHomeDir(cwd, name))
+				if err != nil {
+					return err
+				}
+				opts.Sandbox = &sb
+				fmt.Fprintf(os.Stderr, "note: HOME/TMPDIR/XDG_* now point at %s for this session; restore with 'eval \"$(shellenv deactivate)\"'\n", sb.Home)
+			}
+
+			code := shell.ActivationCodeWithOptions(shellType, pdir, name, opts)
 			fmt.Println(code)
 			return nil
 		},
@@ -83,5 +96,7 @@ func init() {
 	c.Flags().StringVar(&actShellType, "shell-type", "", "override detected shell type (bash|zsh|fish)")
 	c.Flags().BoolVar(&actStrictShell, "strict-shell", false,
 		"require the declared shell runtime to be installed; fail instead of falling back to the system shell")
+	c.Flags().BoolVar(&actIsolateHome, "isolate-home", false,
+		"redirect HOME/TMPDIR/XDG_* to the env sandbox for this session; restore with 'shellenv deactivate'")
 	rootCmd.AddCommand(c)
 }

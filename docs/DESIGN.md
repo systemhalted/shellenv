@@ -35,7 +35,9 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   composes with whatever the user is already doing. It also keeps the tool stateless about
   shell lifecycle.
 - **Trade-off**: Changes (PATH, prompt, sourced profile options) persist in that session
-  until the user resets them; there is no automatic deactivation.
+  until the user resets them; there is no automatic deactivation. Since R7 (decision 14),
+  `eval "$(shellenv deactivate)"` restores PATH/prompt/vars explicitly — sourced shell
+  options remain unrestorable from outside.
 - **Status**: Current.
 
 ## 4. `exec` resolves the command path manually
@@ -161,6 +163,27 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   the network and toolchain.
 - **Status**: Current.
 
+## 14. Opt-in session isolation (`activate --isolate-home`) + snapshot-restore `deactivate`
+- **Decision**: `activate --isolate-home` redirects `HOME`/`TMPDIR`/`XDG_*` at the same
+  per-env sandbox `exec` uses (`project.EnsureSandboxDirs`; the CLI pre-creates the dirs so
+  stdout stays pure shell code). Every activation — isolated or not — first saves PATH and
+  PS1 (and, when isolating, the five redirected vars) into write-once `SHELLENV_OLD_*`
+  variables. The new `shellenv deactivate` prints guard-everything restore code: whole-PATH
+  snapshot restore, guarded per-var restores with an empty→unset rule, then unsets all
+  `SHELLENV_*`.
+- **Why**: Completes R1's deferred remainder. Opt-in because redirecting HOME mid-session
+  breaks tools keyed on the real home (prompt frameworks re-reading `~/.config`, ssh/git
+  missing `~/.ssh`/`~/.gitconfig`, agents); activate prints a stderr note pointing at
+  deactivate when the flag is used. Write-once saves make double activation coherent:
+  deactivate restores the pre-first-activation state. Whole-PATH snapshot beats surgically
+  stripping the prepended dirs — trivially correct regardless of which optional dirs were
+  added.
+- **Trade-off**: PATH edits made during the session are lost on deactivate (snapshot
+  semantics); a var that was originally set-but-empty restores to unset (equivalent for
+  these consumers); shell options changed by a sourced profile (`set -e`) cannot be
+  restored from outside the shell. All documented in README.
+- **Status**: Current.
+
 ---
 
 # Roadmap (gap-closing)
@@ -171,8 +194,8 @@ high-value, and directly serve "don't impact the host."
 - **R1 (P0) — Isolate `HOME`/`TMPDIR`/`XDG_*` for `exec`. _Done._** `exec` creates a per-env
   sandbox home (`./.shellenv/<env>/home/`, via `project.SandboxHomeDir`) and overrides
   `HOME`/`TMPDIR`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME`/`XDG_DATA_HOME` in the child env only.
-  Remaining: doing the same for an `eval`'d `activate` session without breaking the user's
-  interactive shell (likely opt-in).
+  The remaining piece — the same isolation for an `eval`'d `activate` session — landed as
+  R7 (`activate --isolate-home`, opt-in).
 - **R2 (P0) — Make `exec` honor the declared profile. _Done._** `exec --profile` sources the
   env's profile (resolved via `shell.ResolveProfile`) in the declared shell
   (`profileShell` derives the interpreter from `metadata.Shell`) and runs the command inside
@@ -203,4 +226,9 @@ high-value, and directly serve "don't impact the host."
   container mount) removed after the child exits, on success or failure. Corrupt
   `metadata.json` now warns on stderr instead of silently dropping profile/pinning (missing
   file stays silent). Added isolation-breach tests: XDG writes land in the sandbox, ephemeral
-  homes are cleaned up, and `activate` stdout never overrides `HOME`/`TMPDIR`/`XDG_*`.
+  homes are cleaned up, and default `activate` stdout never overrides `HOME`/`TMPDIR`/`XDG_*`.
+- **R7 — Session isolation for `activate` + `deactivate`. _Done._** `activate
+  --isolate-home` redirects `HOME`/`TMPDIR`/`XDG_*` at the env sandbox for the session
+  (opt-in; a stderr note points at the restore); new `shellenv deactivate` prints
+  guard-everything code restoring PATH/PS1/vars and unsetting all `SHELLENV_*` — a silent
+  no-op when nothing is active (see decision 14).
