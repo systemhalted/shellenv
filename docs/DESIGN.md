@@ -21,7 +21,7 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
 ## 2. Per-project `./.shellenv/<env>/` + global `SHELLENV_HOME` split
 - **Decision**: Keep project-scoped config (`metadata.json`, `bin/`, `current`) inside the
   repo under `./.shellenv/`, and keep shared/installed runtimes under a global
-  `SHELLENV_HOME` (default `~/.shellenv`, with `installs/`, `shims/`, `cache/`, `tmp/`).
+  `SHELLENV_HOME` (default `~/.shellenv`, with `installs/`, `cache/`, `tmp/`).
 - **Why**: Mirrors the pyenv/rbenv mental model. Project config travels with the repo and is
   reviewable; heavy installed runtimes are shared across projects instead of duplicated.
 - **Trade-off**: Two roots to reason about; `SHELLENV_HOME` is global mutable state that the
@@ -125,6 +125,19 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   host installs path is meaningless inside the image) and rejects `--strict-shell`.
 - **Status**: Current.
 
+## 12. Remove `shims/` in favor of per-env PATH pinning
+- **Decision**: Drop the unused `$SHELLENV_HOME/shims` directory and everything that
+  referenced it: `env.ShimsDir()`, the `init` PATH hint ("add …/shims to your rc file"),
+  and `doctor`'s shims line. Existing on-disk `shims/` dirs are left alone (harmless, empty).
+- **Why**: Nothing ever wrote into `shims/`. A global shims dir on the login PATH is the
+  pyenv model for *global* version switching, which contradicts this tool's promise of
+  per-project envs that never touch the login shell — `init`'s only PATH hint asked users to
+  edit their rc file for a no-op. R3 delivers version pinning per env at activate/exec time
+  instead.
+- **Trade-off**: If R5 (real installers) ever wants pyenv-style shims, this is a ~20-line
+  git revert away; the decision record stays so the context isn't lost.
+- **Status**: Current.
+
 ---
 
 # Roadmap (gap-closing)
@@ -152,8 +165,10 @@ high-value, and directly serve "don't impact the host."
   Host-only: `--container` skips resolution, and combining it with `--strict-shell` errors.
   Remaining: until R5 lands, installed runtimes are placeholder dirs, so pinning is only as
   real as what you put in the installs bin.
-- **R4 (P1) — Use or remove `shims/`.** Either generate `exec`-style shims per installed
-  runtime (pyenv model) or drop the unused directory and its references.
+- **R4 (P1) — Use or remove `shims/`. _Done (removed)._** Dropped the unused directory,
+  `env.ShimsDir()`, `init`'s rc-file PATH hint, and `doctor`'s shims line (see decision 12).
+  R3's per-env PATH pinning supersedes the global-shims model; trivially reversible via git
+  if R5 ever wants shims back.
 - **R5 (P2, large) — Real runtime installers.** Replace placeholder `install.go` with actual
   download/build of pinned shell versions.
 - **R6 (P2) — Fish profiles, cleanup, robustness.** Add fish-syntax profile variants and

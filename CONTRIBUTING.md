@@ -20,7 +20,7 @@ Keep changes small, tested, and contained to avoid touching your real shell setu
 
 ## Documentation
 - Update docs when behavior changes (commands, flags, env vars, profiles, activation logic, defaults).
-- Primary docs: `README.md` (user install/usage), `CONTRIBUTING.md` (workflow/standards), `docs/ARCHITECTURE.md` (design/flows), `docs/Task.md` (AI task log).
+- Primary docs: `README.md` (user install/usage), `CONTRIBUTING.md` (workflow/standards), `docs/ARCHITECTURE.md` (architecture/flows), `docs/DESIGN.md` (design decisions and roadmap), `docs/Task.md` (AI task log).
 - Add new files under `docs/` only when needed and link them from `README.md`.
 
 ## Commits and PRs

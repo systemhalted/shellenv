@@ -18,9 +18,7 @@ var doctorCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		shims, _ := env.ShimsDir()
 		fmt.Printf("Home:  %s\n", h)
-		fmt.Printf("Shims: %s\n", shims)
 		if fi, err := os.Stat(h); err == nil && (fi.Mode()&0o002) != 0 {
 			fmt.Println("Warning: home dir is world-writable; consider chmod 755 or 700")
 		}

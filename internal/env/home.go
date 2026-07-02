@@ -24,7 +24,7 @@ func EnsureHome() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	subdirs := []string{"installs", "shims", "cache", "tmp"}
+	subdirs := []string{"installs", "cache", "tmp"}
 	for _, sd := range subdirs {
 		if err := os.MkdirAll(filepath.Join(h, sd), 0o755); err != nil {
 			return "", err
@@ -39,12 +39,4 @@ func InstallsDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(h, "installs"), nil
-}
-
-func ShimsDir() (string, error) {
-	h, err := EnsureHome()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(h, "shims"), nil
 }

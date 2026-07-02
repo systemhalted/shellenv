@@ -22,10 +22,9 @@ make build          # produces ./dist/shellenv
 The examples below call the binary as `shellenv`; from a fresh checkout use `./dist/shellenv` (or put `dist/` on your `PATH`).
 
 ## Concepts
-- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `shims/`, `cache/`, and `tmp/`. Point it at a throwaway directory while experimenting to keep your real home pristine.
+- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `cache/`, and `tmp/`. Point it at a throwaway directory while experimenting to keep your real home pristine.
 - **Project envs** (`./.shellenv/<env>/`): created by `shellenv create`. Each holds `metadata.json` (declared shell + profile), a `bin/` directory for project-local tools, and a sandbox `home/` directory used by `exec` (below).
 - **Profiles**: option presets sourced into the shell — built-ins `strict` (`set -euo pipefail`), `posix` (`set -o posix`), and `interactive`. Resolved via `SHELLENV_PROFILES` → `./profiles/<name>.sh` → next to the binary.
-- **Shims** (`$SHELLENV_HOME/shims`): reserved for a future pyenv-style shim mechanism. It is **not used yet**, so the PATH hint printed by `shellenv init` is currently a no-op — you can ignore it.
 
 ## Quick start
 ```bash
@@ -116,7 +115,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 ```
 
 ## Command reference
-- `shellenv init`: create the global home and print PATH guidance.
+- `shellenv init`: create the global home.
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive] [--with-tools]`: scaffold a project env.
 - `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
 - `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell]`: print an activation snippet to `eval`.

@@ -95,8 +95,13 @@ func TestInitCommandCreatesMarker(t *testing.T) {
 	if string(data) != "ok\n" {
 		t.Fatalf("marker contents = %q", data)
 	}
-	if !strings.Contains(stdout, home) || !strings.Contains(stdout, "Add this to your shell rc file") {
+	if !strings.Contains(stdout, "Initialized shellenv at "+home) {
 		t.Fatalf("unexpected init output: %s", stdout)
+	}
+	// The old shims PATH hint is gone (R4): init must not tell users to
+	// edit their shell rc file.
+	if strings.Contains(stdout, "shell rc file") || strings.Contains(stdout, "shims") {
+		t.Fatalf("init should no longer print the shims PATH hint, got: %s", stdout)
 	}
 }
 
@@ -519,5 +524,8 @@ func TestDoctorWarnsOnWorldWritable(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "OK") {
 		t.Fatalf("expected OK line in output: %s", stdout)
+	}
+	if strings.Contains(stdout, "Shims") {
+		t.Fatalf("doctor should no longer report shims, got: %s", stdout)
 	}
 }

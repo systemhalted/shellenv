@@ -35,7 +35,7 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 - **Not for**: sandboxing untrusted or malicious code. A hostile script can still reach the network, read secrets from the environment, and touch the real filesystem.
 
 ## Layout and data
-- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `shims/`, `cache/`, and `tmp/`. A `.initialized` marker is written as part of setup.
+- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `cache/`, and `tmp/`. A `.initialized` marker is written as part of setup.
 - **Project envs** (`./.shellenv/<env>`): contain `metadata.json`, a `bin/` directory for project-local tools, and optional helper files (e.g., `activate.sh`). `shellenv create` scaffolds this structure; `shellenv use` records the current env in `./.shellenv/current`.
 - **Profiles**: sourced shell options under `profiles/` (built-ins: `strict`, `posix`, `interactive`). Overridable via `SHELLENV_PROFILES` or `./profiles/`.
 
@@ -48,7 +48,7 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 - `internal/shell`: activation snippet generation and profile resolution.
 
 ## Command flows
-- **init**: ensures `SHELLENV_HOME` exists, prints PATH instructions, writes `.initialized`.
+- **init**: ensures `SHELLENV_HOME` exists, writes `.initialized`.
 - **create**: writes `metadata.json` (name, shell, profile, tools placeholder) and ensures `bin/` exists under `./.shellenv/<env>`.
 - **activate**: picks an env (arg → `./.shellenv/current` → `default`), verifies it exists, resolves the profile (`SHELLENV_PROFILES` → `./profiles` → alongside the binary) and the declared shell runtime (`$SHELLENV_HOME/installs/<shell>/<version>/bin`, warning on stderr if declared but missing; `--strict-shell` errors instead), and prints shell code that sets `SHELLENV_ACTIVE=1`, `SHELLENV_ENV_NAME`, prepends `bin/` (then the runtime bin) to `PATH`, and prefixes the prompt. Fish activation skips profile sourcing.
 - **exec**: uses the same env selection as `activate`, builds a child env with `bin/` prepended (followed by the declared shell's installs bin when resolved — same warning/`--strict-shell` behavior as `activate`) and `SHELLENV_*` vars set, and additionally redirects `HOME`/`TMPDIR`/`XDG_*` to a per-env sandbox (`./.shellenv/<env>/home/`) so scripts don't write to the real home. Under host execution (default), if `--profile` is used, it runs the command *inside* the declared shell after sourcing the env's profile. Under containerized execution (`--container <image>`), it detects the container CLI engine (`docker` or `podman`), mounts the workspace (`-v cwd:cwd`), aligns the working directory, forwards the sandboxed environment variables, and executes the target command wrapped in `sh -c` inside the container to prepend the sandbox `bin/` and source profiles if requested. The child's exit code is mirrored exactly as shellenv's own exit status.
@@ -80,7 +80,6 @@ These are known gaps between the tool's intent and its current behavior. Priorit
 - **Declared profile via `exec`: done (was P0).** `shellenv exec --profile -- …` sources the env's profile in the declared shell and runs the command inside it. Opt-in (default off) to preserve `exec` semantics for non-shell commands. Caveat: shell *options* (`set -e`, etc.) apply to commands the profiled shell runs directly, not to interpreters the command re-invokes — enforcing options on an arbitrary spawned script is out of scope for PATH-shimming.
 - **Declared shell resolution: done (was P1), but installers are still placeholders.** `activate` and `exec` now resolve `metadata.json`'s `Shell` (e.g. `bash@5.2`) to `$SHELLENV_HOME/installs/<shell>/<version>/bin` and prepend it to PATH after the env's `bin/`. A declared-but-uninstalled runtime warns on stderr and falls back to the system shell; `--strict-shell` turns that into an error. Caveats: until real installers land (P2), the installs bin only contains what you put there; resolution is host-only, so `--container` skips it (and rejects `--strict-shell`).
 - **Runtime installers are placeholders (P1).** `install`/`uninstall`/`versions` only create/remove directories under `$SHELLENV_HOME/installs/` and write a `placeholder runtime` marker; no shell is downloaded or built.
-- **`shims/` is created but unused (P1).** `init` makes `$SHELLENV_HOME/shims`, but nothing populates it.
 - **Fish profiles are not sourced (P2).** Fish activation uses `set -gx` syntax and skips profile sourcing (no POSIX `source`), so fish gets weaker option enforcement.
 - **No automatic cleanup (P2).** Beyond manual `destroy`, there is no `defer`-based teardown of temporary state.
 - **Robustness/test gaps (P2).** Corrupt `metadata.json` handling is untested, and there are no isolation-breach tests.

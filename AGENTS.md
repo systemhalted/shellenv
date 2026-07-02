@@ -5,7 +5,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 ## Project Structure & Module Organization
 - `cmd/shellenv`: CLI entrypoint.
 - `internal/cli`: Cobra commands (`init`, `create`, `activate`, `use`, etc.).
-- `internal/env`: Resolves `$SHELLENV_HOME` or `~/.shellenv`; ensures subdirectories (`installs/`, `shims/`, `cache/`, `tmp/`).
+- `internal/env`: Resolves `$SHELLENV_HOME` or `~/.shellenv`; ensures subdirectories (`installs/`, `cache/`, `tmp/`); resolves declared shell runtimes under `installs/`.
 - `internal/project`: Per-project metadata under `./.shellenv/<env>/`.
 - `internal/shell`: Activation/profile handling.
 - `profiles/`: Option presets (`strict.sh`, `posix.sh`, `interactive.sh`).
@@ -43,5 +43,5 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 
 
 ## Security & Configuration Tips
-- Develop with `SHELLENV_HOME` pointed at a throwaway directory to keep installs and shims out of your main home.
+- Develop with `SHELLENV_HOME` pointed at a throwaway directory to keep installs out of your main home.
 - Avoid persisting real shells or tools in repo paths; prefer temporary dirs under `./.shellenv/<env>/` during tests.

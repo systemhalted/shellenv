@@ -17,6 +17,8 @@
 - Added exec tests for HOME/TMPDIR isolation and profile sourcing; updated ARCHITECTURE/DESIGN/README to match.
 - R2 polish: silenced Cobra's usage/duplicate-error dump (`SilenceUsage`/`SilenceErrors`); `exec` now propagates a child's real exit code via an `exitError` type instead of always exiting 1, and runtime errors print a single clean line.
 - Added `--container <image>` flag to `shellenv exec` to run commands inside Docker or Podman containers. Implemented TTY detection, volume mounts for the workspace, working directory mapping, environment variable forwarding, and entrypoint wrapping via `sh -c`. Added unit and integration tests, and updated documentation.
+- Installed Go 1.26.4 (user-local, `~/.local/go`) and bats 1.13; verified and committed the pending `--container` work after running the full unit + integration suites.
 - R3: `activate`/`exec` now resolve the declared `<shell>@<version>` to `$SHELLENV_HOME/installs/<shell>/<version>/bin` (new `env.ParseShellVersion`/`env.ResolveRuntime`) and prepend it to PATH after the env `bin/`. Declared-but-missing runtimes warn on stderr and fall back to the system shell; new `--strict-shell` flag on both commands errors instead. Container mode skips resolution and rejects `--strict-shell`. `install`/`uninstall` now share `ParseShellVersion`. Added unit tests (env + cli), two bats tests, and updated README/ARCHITECTURE/DESIGN (decision 11, R3 done).
+- R4: removed the unused `$SHELLENV_HOME/shims` directory and its references (`env.ShimsDir`, `init`'s rc-file PATH hint, `doctor`'s Shims line); per-env PATH pinning from R3 supersedes global shims (DESIGN decision 12, R4 done). Also listed `docs/DESIGN.md` in CONTRIBUTING's doc-ownership list.
 
 Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.
