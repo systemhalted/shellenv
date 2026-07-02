@@ -79,6 +79,21 @@ func runCLI(t *testing.T, dir string, args ...string) (string, string, error) {
 	return stdoutBuf.String(), stderrBuf.String(), execErr
 }
 
+func TestVersionFlag(t *testing.T) {
+	// Note: cobra prints the version through the writer set by SetOut, which
+	// runCLI's pipe-copier can clobber (see the R3 harness note), so assert
+	// on the wiring rather than captured stdout.
+	if rootCmd.Version != version {
+		t.Fatalf("rootCmd.Version = %q, want %q", rootCmd.Version, version)
+	}
+	if version == "" {
+		t.Fatalf("version must never be empty (cobra would drop the --version flag)")
+	}
+	if _, _, err := runCLI(t, "", "--version"); err != nil {
+		t.Fatalf("--version returned error: %v", err)
+	}
+}
+
 func TestInitCommandCreatesMarker(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("SHELLENV_HOME", home)

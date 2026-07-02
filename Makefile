@@ -1,10 +1,12 @@
 SHELL := /bin/bash
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
 .PHONY: build test itest
 
 build:
 	mkdir -p dist
-	go build -o dist/shellenv ./cmd/shellenv
+	go build -ldflags "-X github.com/systemhalted/shellenv/internal/cli.version=$(VERSION)" -o dist/shellenv ./cmd/shellenv
 
 test:
 	go test ./...

@@ -13,6 +13,19 @@ Per-project shell sandboxes for testing scripts against specific shells and opti
 This project is provided as-is with no warranties; use at your own risk. See `LICENSE` for details.
 
 ## Install & build
+
+### From a release
+Download the tarball for your platform from the [releases page](https://github.com/systemhalted/shellenv/releases), verify it against `SHA256SUMS`, extract it, and put the extracted directory on your `PATH`:
+
+```bash
+tar -xzf shellenv-<version>-linux-amd64.tar.gz
+export PATH="$PWD/shellenv-<version>-linux-amd64:$PATH"
+shellenv --version
+```
+
+Keep the binary next to its bundled `profiles/` directory — built-in profiles resolve relative to the executable. If you symlink the bare binary elsewhere instead, also set `SHELLENV_PROFILES` to the extracted `profiles/` directory or profile resolution silently falls back to `./profiles` only.
+
+### From source
 Prerequisites: **Go 1.22+** and `make` on your `PATH` (plus [`bats`](https://github.com/bats-core/bats-core) only if you run the integration tests).
 
 ```bash
