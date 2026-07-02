@@ -109,6 +109,22 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
 - **Trade-off**: Requires a container CLI (Docker or Podman) to be running on the host machine.
 - **Status**: Current.
 
+## 11. Declared shell resolution: warn-and-fallback, strictness opt-in (`--strict-shell`)
+- **Decision**: `activate`/`exec` resolve `metadata.Shell` (`<shell>@<version>`) to
+  `$SHELLENV_HOME/installs/<shell>/<version>/bin` via `env.ResolveRuntime` and prepend it to
+  PATH *after* the env's `bin/`. A declared-but-uninstalled runtime produces a stderr warning
+  and falls back to the system shell; `--strict-shell` makes it a hard error instead.
+- **Why**: Installers are placeholders until R5, so hard-erroring on a missing runtime would
+  break every `create → exec` workflow that exists today. The warning ends the previous
+  silent fallback; the flag gives users who want enforced pinning the roadmap's strict
+  behavior. Opt-in-flag precedent: `exec --profile` (R2). Env bin stays first on PATH so
+  project-local tools keep their existing precedence.
+- **Trade-off**: A warning is easier to miss than an error. `--strict-shell` with an
+  unversioned declaration (`shell` without `@version`) also errors — strictness that silently
+  enforces nothing would be a footgun. Resolution is host-only: `--container` skips it (a
+  host installs path is meaningless inside the image) and rejects `--strict-shell`.
+- **Status**: Current.
+
 ---
 
 # Roadmap (gap-closing)
@@ -128,10 +144,14 @@ high-value, and directly serve "don't impact the host."
   options apply only to commands the profiled shell runs directly — a re-invoked interpreter
   (script shebang, `bash -c`) inherits only the profile's exported environment, which is
   inherent to PATH-shimming rather than OS-level isolation.
-- **R3 (P1) — Resolve and use the declared shell version.** Have `activate`/`exec` look up
-  `metadata.Shell` under `$SHELLENV_HOME/installs/<shell>/<version>/bin` (via
-  `env.InstallsDir()`), prepend it, and error clearly if missing instead of silently using the
-  system shell.
+- **R3 (P1) — Resolve and use the declared shell version. _Done._** `activate` and `exec`
+  resolve `metadata.Shell` under `$SHELLENV_HOME/installs/<shell>/<version>/bin` (via
+  `env.ResolveRuntime`) and prepend it to PATH after the env's `bin/` (project-local tools
+  keep winning). A declared-but-missing runtime warns on stderr and falls back to the system
+  shell; `--strict-shell` (on both commands) turns that into a hard error (see decision 11).
+  Host-only: `--container` skips resolution, and combining it with `--strict-shell` errors.
+  Remaining: until R5 lands, installed runtimes are placeholder dirs, so pinning is only as
+  real as what you put in the installs bin.
 - **R4 (P1) — Use or remove `shims/`.** Either generate `exec`-style shims per installed
   runtime (pyenv model) or drop the unused directory and its references.
 - **R5 (P2, large) — Real runtime installers.** Replace placeholder `install.go` with actual

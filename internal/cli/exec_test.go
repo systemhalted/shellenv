@@ -129,6 +129,7 @@ func TestExecIsolatesHomeAndTmpdir(t *testing.T) {
 
 func TestExecWithProfileSourcesProfile(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 
 	// Project-local profile that exports a sentinel variable.
 	profDir := filepath.Join(dir, "profiles")
@@ -165,6 +166,7 @@ func TestExecWithProfileSourcesProfile(t *testing.T) {
 
 func TestExecWithProfileAppliesShellOptionsToDirectCommand(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 
 	profDir := filepath.Join(dir, "profiles")
 	if err := os.MkdirAll(profDir, 0o755); err != nil {
@@ -186,6 +188,7 @@ func TestExecWithProfileAppliesShellOptionsToDirectCommand(t *testing.T) {
 
 func TestExecWithProfileErrorsWhenProfileMissing(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 
 	// Env exists but no resolvable profile is available.
 	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
@@ -235,6 +238,157 @@ func TestExecErrorsWhenCommandMissing(t *testing.T) {
 	_, _, err := runCLI(t, dir, "exec", "--", "does-not-exist")
 	if err == nil || !strings.Contains(err.Error(), "command \"does-not-exist\" not found") {
 		t.Fatalf("expected missing command error, got %v", err)
+	}
+}
+
+// installRuntimeTool places an executable script into the placeholder
+// runtime bin dir that `shellenv install` created for shell@version.
+func installRuntimeTool(t *testing.T, home, shell, version, name, content string) string {
+	t.Helper()
+	binDir := filepath.Join(home, "installs", shell, version, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir runtime bin: %v", err)
+	}
+	tool := filepath.Join(binDir, name)
+	if err := os.WriteFile(tool, []byte(content), 0o755); err != nil {
+		t.Fatalf("write runtime tool: %v", err)
+	}
+	return binDir
+}
+
+func TestExecPrependsInstalledRuntimeBin(t *testing.T) {
+	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+
+	if _, _, err := runCLI(t, dir, "install", "bash@5.2"); err != nil {
+		t.Fatalf("install returned error: %v", err)
+	}
+	output := filepath.Join(dir, "out.txt")
+	installRuntimeTool(t, home, "bash", "5.2", "pinnedtool",
+		fmt.Sprintf("#!/bin/sh\necho pinned > %q\n", output))
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "exec", "--", "pinnedtool")
+	if err != nil {
+		t.Fatalf("exec returned error: %v (stderr: %s)", err, stderr)
+	}
+	if got, _ := os.ReadFile(output); strings.TrimSpace(string(got)) != "pinned" {
+		t.Fatalf("expected pinned tool to run, got output %q", got)
+	}
+	if strings.Contains(stderr, "warning") {
+		t.Fatalf("expected no warning for installed runtime, got: %s", stderr)
+	}
+}
+
+func TestExecRuntimeBinOrderedAfterEnvBin(t *testing.T) {
+	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+
+	output := filepath.Join(dir, "out.txt")
+	installRuntimeTool(t, home, "bash", "5.2", "whoami-tool",
+		fmt.Sprintf("#!/bin/sh\necho runtime > %q\n", output))
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+	envBin := filepath.Join(project.EnvDir(dir, "default"), "bin")
+	if err := os.MkdirAll(envBin, 0o755); err != nil {
+		t.Fatalf("mkdir env bin: %v", err)
+	}
+	script := fmt.Sprintf("#!/bin/sh\necho envbin > %q\n", output)
+	if err := os.WriteFile(filepath.Join(envBin, "whoami-tool"), []byte(script), 0o755); err != nil {
+		t.Fatalf("write env tool: %v", err)
+	}
+
+	if _, stderr, err := runCLI(t, dir, "exec", "--", "whoami-tool"); err != nil {
+		t.Fatalf("exec returned error: %v (stderr: %s)", err, stderr)
+	}
+	if got, _ := os.ReadFile(output); strings.TrimSpace(string(got)) != "envbin" {
+		t.Fatalf("expected env bin to win over runtime bin, got %q", got)
+	}
+}
+
+func TestExecWarnsWhenDeclaredShellMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@9.9"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+	envBin := filepath.Join(project.EnvDir(dir, "default"), "bin")
+	if err := os.MkdirAll(envBin, 0o755); err != nil {
+		t.Fatalf("mkdir env bin: %v", err)
+	}
+	output := filepath.Join(dir, "out.txt")
+	script := fmt.Sprintf("#!/bin/sh\necho ran > %q\n", output)
+	if err := os.WriteFile(filepath.Join(envBin, "tool"), []byte(script), 0o755); err != nil {
+		t.Fatalf("write tool: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "exec", "--", "tool")
+	if err != nil {
+		t.Fatalf("exec should fall back to system shell, got error: %v", err)
+	}
+	if got, _ := os.ReadFile(output); strings.TrimSpace(string(got)) != "ran" {
+		t.Fatalf("expected command to run despite missing runtime, got %q", got)
+	}
+	if !strings.Contains(stderr, "bash@9.9") || !strings.Contains(stderr, "not installed") {
+		t.Fatalf("expected missing-runtime warning naming bash@9.9, got: %s", stderr)
+	}
+}
+
+func TestExecStrictShellErrorsWhenMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@9.9"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	_, _, err := runCLI(t, dir, "exec", "--strict-shell", "--", "true")
+	if err == nil || !strings.Contains(err.Error(), "bash@9.9") || !strings.Contains(err.Error(), "not installed") {
+		t.Fatalf("expected strict-shell missing-runtime error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "shellenv install bash@9.9") {
+		t.Fatalf("expected actionable install hint in error, got %v", err)
+	}
+}
+
+func TestExecStrictShellRejectedWithContainer(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	_, _, err := runCLI(t, dir, "exec", "--strict-shell", "--container", "alpine", "--", "true")
+	if err == nil || !strings.Contains(err.Error(), "--strict-shell") || !strings.Contains(err.Error(), "--container") {
+		t.Fatalf("expected strict-shell/container conflict error, got %v", err)
+	}
+}
+
+func TestExecUnversionedShellSkipsResolution(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+	envBin := filepath.Join(project.EnvDir(dir, "default"), "bin")
+	if err := os.MkdirAll(envBin, 0o755); err != nil {
+		t.Fatalf("mkdir env bin: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "exec", "--", "true")
+	if err != nil {
+		t.Fatalf("exec returned error: %v", err)
+	}
+	if strings.Contains(stderr, "warning") {
+		t.Fatalf("expected no warning for unversioned shell, got: %s", stderr)
 	}
 }
 

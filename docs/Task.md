@@ -17,5 +17,6 @@
 - Added exec tests for HOME/TMPDIR isolation and profile sourcing; updated ARCHITECTURE/DESIGN/README to match.
 - R2 polish: silenced Cobra's usage/duplicate-error dump (`SilenceUsage`/`SilenceErrors`); `exec` now propagates a child's real exit code via an `exitError` type instead of always exiting 1, and runtime errors print a single clean line.
 - Added `--container <image>` flag to `shellenv exec` to run commands inside Docker or Podman containers. Implemented TTY detection, volume mounts for the workspace, working directory mapping, environment variable forwarding, and entrypoint wrapping via `sh -c`. Added unit and integration tests, and updated documentation.
+- R3: `activate`/`exec` now resolve the declared `<shell>@<version>` to `$SHELLENV_HOME/installs/<shell>/<version>/bin` (new `env.ParseShellVersion`/`env.ResolveRuntime`) and prepend it to PATH after the env `bin/`. Declared-but-missing runtimes warn on stderr and fall back to the system shell; new `--strict-shell` flag on both commands errors instead. Container mode skips resolution and rejects `--strict-shell`. `install`/`uninstall` now share `ParseShellVersion`. Added unit tests (env + cli), two bats tests, and updated README/ARCHITECTURE/DESIGN (decision 11, R3 done).
 
 Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.

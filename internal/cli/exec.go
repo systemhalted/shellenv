@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/env"
 	"github.com/systemhalted/shellenv/internal/project"
 	"github.com/systemhalted/shellenv/internal/shell"
 )
@@ -16,6 +17,7 @@ import (
 var (
 	execWithProfile bool
 	execContainer   string
+	execStrictShell bool
 )
 
 func init() {
@@ -23,6 +25,8 @@ func init() {
 		"source the env's declared profile (e.g. strict) before running the command")
 	execCmd.Flags().StringVar(&execContainer, "container", "",
 		"run the command inside the specified container image (e.g., ubuntu:22.04)")
+	execCmd.Flags().BoolVar(&execStrictShell, "strict-shell", false,
+		"require the declared shell runtime to be installed; fail instead of falling back to the system shell")
 	rootCmd.AddCommand(execCmd)
 }
 
@@ -66,8 +70,41 @@ var execCmd = &cobra.Command{
 			return fmt.Errorf("env %q not found at %s (run 'shellenv create' first)", envName, envDir)
 		}
 
+		// Metadata is optional today (corrupt-metadata hardening is R6);
+		// a missing file simply leaves the shell unpinned and profile unset.
+		md, _ := project.ReadMetadata(cwd, envName)
+
+		// Resolve the declared shell runtime (host mode only: an installs
+		// path from the host is meaningless inside a container image).
+		var runtimeBin string
+		if execContainer != "" {
+			if execStrictShell {
+				return fmt.Errorf("--strict-shell is not supported with --container (declared shell resolution is host-only; pick an image that provides the shell)")
+			}
+		} else {
+			rb, status, err := env.ResolveRuntime(md.Shell)
+			if err != nil {
+				return err
+			}
+			switch status {
+			case env.RuntimeFound:
+				runtimeBin = rb
+			case env.RuntimeMissing:
+				if execStrictShell {
+					return fmt.Errorf("declared shell %q is not installed (run 'shellenv install %s', or omit --strict-shell)", md.Shell, md.Shell)
+				}
+				fmt.Fprintf(os.Stderr, "warning: declared shell %q is not installed; falling back to the system shell (run 'shellenv install %s' or use --strict-shell to enforce)\n", md.Shell, md.Shell)
+			case env.RuntimeUnpinned:
+				if execStrictShell {
+					return fmt.Errorf("env %q declares no <shell>@<version> to enforce (shell: %q); --strict-shell has nothing to pin", envName, md.Shell)
+				}
+			}
+		}
+
 		binDir := filepath.Join(envDir, "bin")
-		childEnv := prependPath(os.Environ(), binDir)
+		// Env bin must stay first so project-local tools keep winning; the
+		// pinned runtime sits between it and the system PATH.
+		childEnv := prependPath(prependPath(os.Environ(), runtimeBin), binDir)
 		childEnv = upsertEnv(childEnv, "SHELLENV_ENV_NAME", envName)
 		childEnv = upsertEnv(childEnv, "SHELLENV_ACTIVE", "1")
 
@@ -115,7 +152,6 @@ var execCmd = &cobra.Command{
 			var shellScript strings.Builder
 			shellScript.WriteString(fmt.Sprintf("export PATH=%s:$PATH; ", singleQuote(binDir)))
 			if execWithProfile {
-				md, _ := project.ReadMetadata(cwd, envName)
 				profilePath, ok := shell.ResolveProfile(cwd, md.Profile)
 				if !ok {
 					return fmt.Errorf("profile %q not found for env %q (looked in SHELLENV_PROFILES, ./profiles, and beside the binary)", md.Profile, envName)
@@ -128,7 +164,6 @@ var execCmd = &cobra.Command{
 			containerArgs = append(containerArgs, cmdArgs...)
 			child = exec.Command(engine, containerArgs...)
 		} else if execWithProfile {
-			md, _ := project.ReadMetadata(cwd, envName)
 			profilePath, ok := shell.ResolveProfile(cwd, md.Profile)
 			if !ok {
 				return fmt.Errorf("profile %q not found for env %q (looked in SHELLENV_PROFILES, ./profiles, and beside the binary)", md.Profile, envName)

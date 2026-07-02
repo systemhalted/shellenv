@@ -17,8 +17,10 @@ func resetCLIState() {
 	createWithTools = false
 	createProfile = "strict"
 	actShellType = ""
+	actStrictShell = false
 	execWithProfile = false
 	execContainer = ""
+	execStrictShell = false
 }
 
 func runCLI(t *testing.T, dir string, args ...string) (string, string, error) {
@@ -356,6 +358,7 @@ func TestActivateFailsWhenEnvMissing(t *testing.T) {
 
 func TestActivateEmitsProfileSource(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	profileDir := filepath.Join(dir, "profiles")
 	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		t.Fatalf("mkdir profiles: %v", err)
@@ -384,6 +387,7 @@ func TestActivateEmitsProfileSource(t *testing.T) {
 
 func TestActivateUsesCurrentEnvFallback(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	if err := project.WriteMetadata(dir, project.Metadata{Name: "current-env", Shell: "bash@5.0"}); err != nil {
 		t.Fatalf("write metadata: %v", err)
 	}
@@ -397,6 +401,65 @@ func TestActivateUsesCurrentEnvFallback(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "SHELLENV_ENV_NAME=current-env") {
 		t.Fatalf("expected fallback to current env, got: %s", stdout)
+	}
+}
+
+func TestActivateIncludesRuntimeBinWhenInstalled(t *testing.T) {
+	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+
+	if _, _, err := runCLI(t, dir, "install", "bash@5.2"); err != nil {
+		t.Fatalf("install returned error: %v", err)
+	}
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	stdout, stderr, err := runCLI(t, dir, "activate", "--shell-type", "bash")
+	if err != nil {
+		t.Fatalf("activate returned error: %v (stderr: %s)", err, stderr)
+	}
+	runtimeBin := filepath.Join(home, "installs", "bash", "5.2", "bin")
+	envBin := filepath.Join(project.EnvDir(dir, "default"), "bin")
+	if !strings.Contains(stdout, "PATH="+envBin+":"+runtimeBin+":$PATH") {
+		t.Fatalf("expected PATH with env bin then runtime bin, got: %s", stdout)
+	}
+}
+
+func TestActivateWarnsOnMissingRuntimeToStderrOnly(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@9.9"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	stdout, stderr, err := runCLI(t, dir, "activate", "--shell-type", "bash")
+	if err != nil {
+		t.Fatalf("activate returned error: %v (stderr: %s)", err, stderr)
+	}
+	// stdout is eval'd by the user's shell: it must carry no warning text
+	// and no reference to the uninstalled runtime path.
+	if strings.Contains(stdout, "warning") || strings.Contains(stdout, "installs") {
+		t.Fatalf("activation stdout must stay pure shell code, got: %s", stdout)
+	}
+	if !strings.Contains(stderr, "bash@9.9") || !strings.Contains(stderr, "not installed") {
+		t.Fatalf("expected missing-runtime warning on stderr, got: %s", stderr)
+	}
+}
+
+func TestActivateStrictShellErrors(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@9.9"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	_, _, err := runCLI(t, dir, "activate", "--strict-shell", "--shell-type", "bash")
+	if err == nil || !strings.Contains(err.Error(), "bash@9.9") || !strings.Contains(err.Error(), "not installed") {
+		t.Fatalf("expected strict-shell missing-runtime error, got %v", err)
 	}
 }
 

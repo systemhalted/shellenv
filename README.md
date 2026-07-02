@@ -96,6 +96,18 @@ shellenv exec --profile -- false && echo reached || echo "aborted ($?)"
 
 **Caveat:** the profile's shell *options* (`set -e`, `set -o pipefail`, …) apply to commands the profiled shell runs directly. A command that re-invokes an interpreter — a script with its own shebang, or `bash -c '…'` — starts a fresh shell and inherits only the profile's **exported environment**, not its options. (Well-written scripts set their own `set -euo pipefail`.) Profiles resolve from `SHELLENV_PROFILES`, then `./profiles/<name>.sh`, then beside the binary — so running `./dist/shellenv` finds the built-ins shipped in this repo; an installed binary needs `./profiles` or `SHELLENV_PROFILES`.
 
+## Pinning the declared shell version
+`create --shell bash@5.2` records the shell your project expects, and `activate`/`exec` now act on it: if `$SHELLENV_HOME/installs/bash/5.2/bin` exists (created by `shellenv install bash@5.2`), it is added to `PATH` right after the env's `bin/`, so the pinned interpreter wins over the system one while project-local tools still win over both.
+
+If the declared version is **not** installed, the command still runs against the system shell but prints a warning to stderr. Pass `--strict-shell` (on `activate` or `exec`) to fail instead:
+
+```bash
+shellenv exec --strict-shell -- ./run-tests.sh
+# error: declared shell "bash@5.2" is not installed (run 'shellenv install bash@5.2', or omit --strict-shell)
+```
+
+**Caveats:** installers are placeholders today, so `shellenv install` creates the runtime's `bin/` directory but doesn't download a shell — pinning takes effect for whatever you place there. Resolution is host-only: `exec --container` skips it (pick an image that provides the shell) and rejects `--strict-shell`.
+
 ## Exit codes & CI
 `shellenv exec` exits with the command's exact status (e.g. `exit 5` above), so it composes cleanly with `set -e` and CI pipelines. Runtime failures print a single clean line rather than a usage dump:
 
@@ -107,10 +119,10 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - `shellenv init`: create the global home and print PATH guidance.
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive] [--with-tools]`: scaffold a project env.
 - `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
-- `shellenv activate [<env>] [--shell-type bash|zsh|fish]`: print an activation snippet to `eval`.
-- `shellenv exec [<env>] [--profile] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
+- `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell]`: print an activation snippet to `eval`.
+- `shellenv exec [<env>] [--profile] [--strict-shell] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
-- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (**placeholder installers today** — the version is recorded but not yet provisioned).
+- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: manage declared runtimes (**placeholder installers today** — the runtime's `bin/` is created and used for PATH pinning, but no shell is downloaded).
 - `shellenv doctor`: quick health check of the global home.
 
 ## Environment variables

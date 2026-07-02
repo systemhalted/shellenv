@@ -7,6 +7,28 @@ import (
 	"testing"
 )
 
+func TestActivationCodeWithRuntimeBin(t *testing.T) {
+	envDir := filepath.Join("/proj", ".shellenv", "default")
+	envBin := filepath.Join(envDir, "bin")
+	runtimeBin := "/homedir/.shellenv/installs/bash/5.2/bin"
+
+	bash := ActivationCodeWithOptions("bash", envDir, "default", ActivationOptions{RuntimeBinDir: runtimeBin})
+	if !strings.Contains(bash, "export PATH="+envBin+":"+runtimeBin+":$PATH") {
+		t.Fatalf("bash activation should order env bin before runtime bin, got: %s", bash)
+	}
+
+	fish := ActivationCodeWithOptions("fish", envDir, "default", ActivationOptions{RuntimeBinDir: runtimeBin})
+	if !strings.Contains(fish, "set -gx PATH "+envBin+" "+runtimeBin+" $PATH") {
+		t.Fatalf("fish activation should order env bin before runtime bin, got: %s", fish)
+	}
+
+	// Without a runtime bin the snippet keeps its original single-dir form.
+	plain := ActivationCodeWithOptions("bash", envDir, "default", ActivationOptions{})
+	if !strings.Contains(plain, "export PATH="+envBin+":$PATH") {
+		t.Fatalf("activation without runtime bin should only prepend env bin, got: %s", plain)
+	}
+}
+
 func TestActivationCode_AllowsUnsetPS1(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash not available")

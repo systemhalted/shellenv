@@ -13,6 +13,9 @@ setup() {
 @test "create + activate + exec" {
   [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
 
+  run bash -lc ''"$BIN"' install bash@5.2'
+  [ "$status" -eq 0 ]
+
   run bash -lc 'mkdir -p proj && cd proj && '"$BIN"' create --shell bash@5.2 --profile strict'
   [ "$status" -eq 0 ]
 
@@ -24,6 +27,34 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "hi" ]]
   rm -rf proj
+}
+
+@test "exec warns and falls back when declared shell is not installed" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+
+  run bash -lc 'mkdir -p proj-warn && cd proj-warn && '"$BIN"' create --shell bash@9.9'
+  [ "$status" -eq 0 ]
+
+  run bash -lc 'cd proj-warn && '"$BIN"' exec -- echo fallback-ok'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "fallback-ok" ]]
+  [[ "$output" =~ "not installed" ]]
+
+  rm -rf proj-warn
+}
+
+@test "exec --strict-shell fails when declared shell is not installed" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+
+  run bash -lc 'mkdir -p proj-strict && cd proj-strict && '"$BIN"' create --shell bash@9.9'
+  [ "$status" -eq 0 ]
+
+  run bash -lc 'cd proj-strict && '"$BIN"' exec --strict-shell -- echo should-not-run'
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "not installed" ]]
+  [[ ! "$output" =~ "should-not-run" ]]
+
+  rm -rf proj-strict
 }
 
 @test "exec with container" {
