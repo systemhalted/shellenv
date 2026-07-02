@@ -1,0 +1,28 @@
+name: Real install
+
+# Exercises the real source-build installer (network + a from-source bash
+# build), which the default CI suite skips. Weekly, plus on demand.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  real-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: build
+        run: make build
+
+      - name: install bats and build toolchain
+        run: sudo apt-get update && sudo apt-get install -y bats build-essential
+
+      - name: integration tests (including real source build)
+        run: SHELLENV_HOME=$(mktemp -d) SHELLENV_TEST_REAL_INSTALL=1 bats -r test/integration
