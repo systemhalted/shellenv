@@ -33,9 +33,12 @@ make build
 
 # Inside a project directory:
 ./dist/shellenv create --shell bash@5.2 --profile strict
-./dist/shellenv exec -- echo "hi from $SHELLENV_ENV_NAME"   # one-off, isolated
+./dist/shellenv install bash@5.2                       # optional: build the pinned bash from source (minutes, once)
+./dist/shellenv exec -- printenv SHELLENV_ENV_NAME     # one-off, isolated -> default
 eval "$(./dist/shellenv activate)"                     # or activate your shell session
 ```
+
+If you skip the `install` step, commands still run against your system shell — you'll just see a one-line warning on stderr that the declared version isn't installed (see [Pinning](#pinning-the-declared-shell-version)).
 
 ## Two ways to run: `activate` vs `exec` (Host and Container Modes)
 Both put the env's `bin/` first on `PATH`. They differ in how far the isolation goes:
@@ -51,10 +54,12 @@ Both put the env's `bin/` first on `PATH`. They differ in how far the isolation 
 | Propagates command exit code | n/a | yes | yes |
 
 - Use **`activate`** for an interactive session where you want the env's tools and profile in your prompt.
-- Use **`exec`** (Host Mode) for one-off or scripted runs you want local-user contained — including writes to `$HOME` and temp files.
+- Use **`exec`** (Host Mode) for one-off or scripted runs you want local-user contained — including writes to `$HOME` and temp files. Add `--ephemeral` for a throwaway sandbox home deleted after the run.
 - Use **`exec --container <image>`** (Container Mode) for system-mutating scripts (like installation scripts) that need full filesystem, process, and network namespace isolation.
 
 For all, the env is chosen as: the name you pass → `./.shellenv/current` (set by `shellenv use`) → `default`.
+
+**Fish users:** the activation syntax differs — pipe instead of `eval`: `shellenv activate --shell-type fish | source`. Fish sessions source the profile's `.fish` variant (see [Concepts](#concepts)).
 
 ## Walkthrough: test a script in isolation
 This runs a script through `exec` and shows that its `$HOME` writes land in the sandbox (your real home is untouched) and that its exit code is propagated.
@@ -65,6 +70,8 @@ export SHELLENV_HOME="$(mktemp -d)"     # or: mkdir /tmp/se-home && export SHELL
 
 # From inside your project directory:
 shellenv create --shell bash@5.2 --profile strict   # makes ./.shellenv/default
+# (exec below will warn that bash@5.2 isn't installed and fall back to the
+#  system shell — harmless here; run `shellenv install bash@5.2` to pin it.)
 
 # A script that writes to $HOME and fails:
 cat > probe.sh <<'EOF'
@@ -83,6 +90,15 @@ test -e "$HOME/wrote-here" && echo "leaked!" || echo "real HOME untouched"
 ```
 
 `exec` resolves commands against the env's `bin/` first, so dropping a tool in `./.shellenv/default/bin/` lets it shadow the system copy for the duration of the run.
+
+## Throwaway runs with `exec --ephemeral`
+By default the sandbox home (`./.shellenv/<env>/home/`) persists between runs, which is handy for inspecting what a script wrote. Add `--ephemeral` to use a fresh throwaway home instead, deleted as soon as the command exits (whether it succeeds or fails):
+
+```bash
+shellenv exec --ephemeral -- ./probe.sh   # $HOME/TMPDIR/XDG writes vanish after the run
+```
+
+It composes with `--container` too — the throwaway home lives under the env dir, so it stays inside the container's workspace mount.
 
 ## Applying a profile with `exec --profile`
 `--profile` sources the env's declared profile in the declared shell before running your command, so the profile's exported settings and shell options are in effect:
@@ -124,7 +140,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - `shellenv exec [<env>] [--profile] [--strict-shell] [--ephemeral] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). `--ephemeral` swaps the persistent sandbox home for a throwaway one deleted after the run. If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
 - `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`), remove one, or list what's installed.
-- `shellenv doctor`: quick health check of the global home.
+- `shellenv doctor`: quick health check of the global home and the build toolchain `install` needs.
 
 ## Environment variables
 - `SHELLENV_HOME`: global state root (default `~/.shellenv`).

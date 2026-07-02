@@ -29,8 +29,8 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 
 
 ## Documentation
-- Primary docs live in README.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, and docs/TASKS.md. Add new docs under docs/ only when needed; get maintainer buy-in and link them from README.md.
-- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = design, flows, sequences; docs/TASKS.md = AI task log for completed work; add release notes/changelog to docs/ when we start versioning.
+- Primary docs live in README.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, docs/DESIGN.md, and docs/Task.md. Add new docs under docs/ only when needed; get maintainer buy-in and link them from README.md.
+- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = architecture, flows, sequences; docs/DESIGN.md = design decisions and roadmap; docs/Task.md = AI task log for completed work; add release notes/changelog to docs/ when we start versioning.
 - Update docs whenever behavior changes: new/changed commands, flags, env vars, profiles, activation logic, or config defaults; keep examples in sync.
 - Style/ownership: short headings, concise sentences, consistent formatting; a reviewer must sign off doc updates that accompany behavior changes.
 - Always update the necessary files after completion of work and before the code is committed and pushed to the remote repo.
