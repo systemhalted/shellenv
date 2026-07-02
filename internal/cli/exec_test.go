@@ -392,6 +392,144 @@ func TestExecUnversionedShellSkipsResolution(t *testing.T) {
 	}
 }
 
+func TestExecIsolatesXDGDirsIntoSandbox(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	envDir := project.EnvDir(dir, "default")
+	binDir := filepath.Join(envDir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	script := filepath.Join(binDir, "xdgprobe")
+	content := "#!/bin/sh\n: > \"$XDG_CONFIG_HOME/cfg\"\n: > \"$XDG_CACHE_HOME/cache\"\n: > \"$XDG_DATA_HOME/data\"\n"
+	if err := os.WriteFile(script, []byte(content), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	if _, stderr, err := runCLI(t, dir, "exec", "--", "xdgprobe"); err != nil {
+		t.Fatalf("exec returned error: %v (stderr: %s)", err, stderr)
+	}
+
+	sandbox := project.SandboxHomeDir(dir, "default")
+	for _, p := range []string{
+		filepath.Join(sandbox, ".config", "cfg"),
+		filepath.Join(sandbox, ".cache", "cache"),
+		filepath.Join(sandbox, ".local", "share", "data"),
+	} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("XDG write did not land in sandbox at %s: %v", p, err)
+		}
+	}
+}
+
+func TestExecEphemeralUsesThrowawayHomeAndCleansUp(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	envDir := project.EnvDir(dir, "default")
+	binDir := filepath.Join(envDir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	script := filepath.Join(binDir, "probe")
+	content := "#!/bin/sh\nprintf %s \"$HOME\" > \"$1\"\n: > \"$HOME/marker\"\n"
+	if err := os.WriteFile(script, []byte(content), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	output := filepath.Join(dir, "out.txt")
+
+	if _, stderr, err := runCLI(t, dir, "exec", "--ephemeral", "--", "probe", output); err != nil {
+		t.Fatalf("exec --ephemeral returned error: %v (stderr: %s)", err, stderr)
+	}
+
+	home, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if !strings.Contains(string(home), "home-ephemeral") {
+		t.Fatalf("expected ephemeral HOME, got %q", home)
+	}
+	// The throwaway home (and the marker inside it) must be gone afterwards.
+	if _, err := os.Stat(string(home)); !os.IsNotExist(err) {
+		t.Fatalf("ephemeral home should be removed, stat err=%v", err)
+	}
+	// The persistent sandbox home must not have been touched.
+	if _, err := os.Stat(filepath.Join(project.SandboxHomeDir(dir, "default"), "marker")); !os.IsNotExist(err) {
+		t.Fatalf("marker leaked into the persistent sandbox home, stat err=%v", err)
+	}
+}
+
+func TestExecEphemeralCleansUpOnChildFailure(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	envDir := project.EnvDir(dir, "default")
+	binDir := filepath.Join(envDir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	script := filepath.Join(binDir, "boom")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 7\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	_, _, err := runCLI(t, dir, "exec", "--ephemeral", "--", "boom")
+	var ee *exitError
+	if !errors.As(err, &ee) || ee.code != 7 {
+		t.Fatalf("expected exit code 7 through --ephemeral, got %v", err)
+	}
+
+	ents, err := os.ReadDir(envDir)
+	if err != nil {
+		t.Fatalf("read env dir: %v", err)
+	}
+	for _, e := range ents {
+		if strings.HasPrefix(e.Name(), "home-ephemeral") {
+			t.Fatalf("ephemeral home %q left behind after child failure", e.Name())
+		}
+	}
+}
+
+func TestExecWarnsOnCorruptMetadata(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	envDir := project.EnvDir(dir, "default")
+	if err := os.MkdirAll(filepath.Join(envDir, "bin"), 0o755); err != nil {
+		t.Fatalf("mkdir env bin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(envDir, "metadata.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatalf("write corrupt metadata: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "exec", "--", "true")
+	if err != nil {
+		t.Fatalf("exec should run despite corrupt metadata, got: %v", err)
+	}
+	if !strings.Contains(stderr, "metadata.json") || !strings.Contains(stderr, "ignoring") {
+		t.Fatalf("expected corrupt-metadata warning, got: %s", stderr)
+	}
+}
+
+func TestExecSilentWhenMetadataMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	envDir := project.EnvDir(dir, "default")
+	if err := os.MkdirAll(filepath.Join(envDir, "bin"), 0o755); err != nil {
+		t.Fatalf("mkdir env bin: %v", err)
+	}
+
+	_, stderr, err := runCLI(t, dir, "exec", "--", "true")
+	if err != nil {
+		t.Fatalf("exec returned error: %v", err)
+	}
+	if strings.Contains(stderr, "metadata") {
+		t.Fatalf("missing metadata should stay silent, got: %s", stderr)
+	}
+}
+
 func TestExecWithContainerCLI(t *testing.T) {
 	dir := t.TempDir()
 

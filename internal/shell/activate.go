@@ -36,11 +36,17 @@ func ActivationCodeWithOptions(shellName, projectEnvDir, envName string, opts Ac
 		if opts.RuntimeBinDir != "" {
 			pathDirs += " " + opts.RuntimeBinDir
 		}
-		// Fish: no POSIX 'source'; skip profile unless you add fish-specific scripts.
-		return fmt.Sprintf(
+		code := fmt.Sprintf(
 			"set -gx SHELLENV_ACTIVE 1; set -gx SHELLENV_ENV_NAME %s; set -gx PATH %s $PATH; set -gx PS1 \"(shellenv:%s) $PS1\";",
 			envName, pathDirs, envName,
 		)
+		// Only a fish-syntax profile may be sourced here; the caller resolves
+		// the .fish variant (ResolveProfileForShell) and omits ProfilePath
+		// when none exists.
+		if opts.ProfilePath != "" {
+			code += fmt.Sprintf(" test -f %s; and source %s;", opts.ProfilePath, opts.ProfilePath)
+		}
+		return code
 	}
 
 	pathDirs := envBin
@@ -61,6 +67,12 @@ func ActivationCodeWithOptions(shellName, projectEnvDir, envName string, opts Ac
 		"export SHELLENV_ACTIVE=1; export SHELLENV_ENV_NAME=%s; export PATH=%s:$PATH; export PS1=\"(shellenv:%s) ${PS1:-}\";",
 		envName, pathDirs, envName,
 	)
+}
+
+// DetectShell reports the shell type an activation snippet will target:
+// the explicit input if given, else the basename of $SHELL, else bash.
+func DetectShell(input string) string {
+	return detectShell(input)
 }
 
 func detectShell(input string) string {

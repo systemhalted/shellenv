@@ -8,10 +8,20 @@ import (
 // ResolveProfile tries multiple locations for <profile>.sh.
 // Returns (absolutePath, true) if found, else ("", false).
 func ResolveProfile(cwd, profile string) (string, bool) {
+	return ResolveProfileForShell(cwd, profile, "")
+}
+
+// ResolveProfileForShell resolves the profile variant for the given shell
+// type: fish looks for <profile>.fish (fish cannot source POSIX scripts, so
+// there is no fallback to .sh); everything else uses <profile>.sh.
+func ResolveProfileForShell(cwd, profile, shellType string) (string, bool) {
 	if profile == "" {
 		return "", false
 	}
 	name := profile + ".sh"
+	if shellType == "fish" {
+		name = profile + ".fish"
+	}
 
 	// 1) SHELLENV_PROFILES override
 	if base := os.Getenv("SHELLENV_PROFILES"); base != "" {

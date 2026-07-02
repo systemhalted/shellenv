@@ -171,6 +171,12 @@ high-value, and directly serve "don't impact the host."
   if R5 ever wants shims back.
 - **R5 (P2, large) — Real runtime installers.** Replace placeholder `install.go` with actual
   download/build of pinned shell versions.
-- **R6 (P2) — Fish profiles, cleanup, robustness.** Add fish-syntax profile variants and
-  source them; add an optional `exec --ephemeral` with `defer`-based teardown; handle corrupt
-  `metadata.json` gracefully; add isolation-breach tests.
+- **R6 (P2) — Fish profiles, cleanup, robustness. _Done._** Fish activation now sources a
+  fish-syntax profile variant (`<profile>.fish`, resolved via `ResolveProfileForShell`; no
+  fallback to `.sh` since fish can't source POSIX scripts — built-ins shipped in
+  `profiles/*.fish` with the honest caveat that fish has no `set -e`/`pipefail`).
+  `exec --ephemeral` runs with a throwaway sandbox home under the env dir (inside the
+  container mount) removed after the child exits, on success or failure. Corrupt
+  `metadata.json` now warns on stderr instead of silently dropping profile/pinning (missing
+  file stays silent). Added isolation-breach tests: XDG writes land in the sandbox, ephemeral
+  homes are cleaned up, and `activate` stdout never overrides `HOME`/`TMPDIR`/`XDG_*`.

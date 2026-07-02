@@ -40,11 +40,13 @@ func init() {
 				return fmt.Errorf("env %q not found at %s (run 'shellenv create' first)", name, pdir)
 			}
 
-			// Load metadata for profile and declared shell
-			md, _ := project.ReadMetadata(cwd, name)
+			// Load metadata for profile and declared shell. The profile
+			// variant depends on the target shell (fish sources .fish).
+			md := loadMetadata(cwd, name)
+			shellType := shell.DetectShell(actShellType)
 			var profilePath string
 			if md.Profile != "" {
-				if p, ok := shell.ResolveProfile(cwd, md.Profile); ok {
+				if p, ok := shell.ResolveProfileForShell(cwd, md.Profile, shellType); ok {
 					profilePath = p
 				}
 			}
@@ -70,7 +72,7 @@ func init() {
 				}
 			}
 
-			code := shell.ActivationCodeWithOptions(actShellType, pdir, name, shell.ActivationOptions{
+			code := shell.ActivationCodeWithOptions(shellType, pdir, name, shell.ActivationOptions{
 				ProfilePath:   profilePath,
 				RuntimeBinDir: runtimeBin,
 			})

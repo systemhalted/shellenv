@@ -49,3 +49,32 @@ func TestResolveProfile_NotFound(t *testing.T) {
 		t.Fatalf("expected missing profile to return ok=false")
 	}
 }
+
+func TestResolveProfileForShell_FishVariant(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("SHELLENV_PROFILES", base)
+	fishProfile := writeTmp(t, base, "strict.fish", "# fish strict\n")
+	shProfile := writeTmp(t, base, "strict.sh", "set -euo pipefail\n")
+
+	got, ok := ResolveProfileForShell("", "strict", "fish")
+	if !ok || got != fishProfile {
+		t.Fatalf("fish should resolve the .fish variant, got (%q, %v)", got, ok)
+	}
+
+	got, ok = ResolveProfileForShell("", "strict", "bash")
+	if !ok || got != shProfile {
+		t.Fatalf("bash should resolve the .sh variant, got (%q, %v)", got, ok)
+	}
+}
+
+func TestResolveProfileForShell_FishWithoutFishVariant(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("SHELLENV_PROFILES", base)
+	writeTmp(t, base, "strict.sh", "set -euo pipefail\n")
+
+	// fish cannot source POSIX profiles, so a missing .fish variant must
+	// report not-found rather than fall back to the .sh file.
+	if got, ok := ResolveProfileForShell("", "strict", "fish"); ok {
+		t.Fatalf("fish must not fall back to the .sh profile, got %q", got)
+	}
+}

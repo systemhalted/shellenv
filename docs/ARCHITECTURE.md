@@ -60,7 +60,7 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 - **Env selection**: `activate`/`exec` pick env → CLI arg > `./.shellenv/current` > `default`.
 - **Profile lookup**: `SHELLENV_PROFILES` > `./profiles/<name>.sh` > alongside the built binary (`dist/.../profiles`).
 - **PATH resolution in exec**: `exec` prepends `<env>/bin` to PATH and resolves the command path manually, honoring the hardened Go 1.19+ rule that ignores the current directory. This ensures project-local shims/binaries run even when the OS PATH search would skip `./`.
-- **Fish vs POSIX**: activation for fish skips profile sourcing (no POSIX `source`) and uses fish env syntax; bash/zsh/posix shells get `SHELLENV_*`, prompt prefix, and optional profile sourcing.
+- **Fish vs POSIX**: fish activation uses fish env syntax and sources the profile's `.fish` variant when one exists (never the `.sh` file); bash/zsh/posix shells get `SHELLENV_*`, prompt prefix, and optional `.sh` profile sourcing.
 
 ## Environment variables
 - `SHELLENV_HOME`: global state root (default `~/.shellenv`).
@@ -80,6 +80,6 @@ These are known gaps between the tool's intent and its current behavior. Priorit
 - **Declared profile via `exec`: done (was P0).** `shellenv exec --profile -- …` sources the env's profile in the declared shell and runs the command inside it. Opt-in (default off) to preserve `exec` semantics for non-shell commands. Caveat: shell *options* (`set -e`, etc.) apply to commands the profiled shell runs directly, not to interpreters the command re-invokes — enforcing options on an arbitrary spawned script is out of scope for PATH-shimming.
 - **Declared shell resolution: done (was P1), but installers are still placeholders.** `activate` and `exec` now resolve `metadata.json`'s `Shell` (e.g. `bash@5.2`) to `$SHELLENV_HOME/installs/<shell>/<version>/bin` and prepend it to PATH after the env's `bin/`. A declared-but-uninstalled runtime warns on stderr and falls back to the system shell; `--strict-shell` turns that into an error. Caveats: until real installers land (P2), the installs bin only contains what you put there; resolution is host-only, so `--container` skips it (and rejects `--strict-shell`).
 - **Runtime installers are placeholders (P1).** `install`/`uninstall`/`versions` only create/remove directories under `$SHELLENV_HOME/installs/` and write a `placeholder runtime` marker; no shell is downloaded or built.
-- **Fish profiles are not sourced (P2).** Fish activation uses `set -gx` syntax and skips profile sourcing (no POSIX `source`), so fish gets weaker option enforcement.
-- **No automatic cleanup (P2).** Beyond manual `destroy`, there is no `defer`-based teardown of temporary state.
-- **Robustness/test gaps (P2).** Corrupt `metadata.json` handling is untested, and there are no isolation-breach tests.
+- **Fish profiles: done (was P2), with a semantic caveat.** Fish activation sources a fish-syntax variant (`<profile>.fish`) when one resolves; there is no fallback to `.sh`. fish itself has no `set -e`/`pipefail` equivalents, so the strict/posix variants only carry comments and exported variables — use a bash/sh env for option-enforcement testing.
+- **Ephemeral cleanup: done (was P2).** `exec --ephemeral` uses a throwaway sandbox home (`./.shellenv/<env>/home-ephemeral-*`) removed after the child exits, success or failure. The persistent `home/` remains the default; `destroy` remains the manual cleanup for whole envs.
+- **Robustness (was P2).** A corrupt `metadata.json` warns on stderr (a missing one stays silent); isolation-breach tests cover XDG redirection, ephemeral teardown, and the guarantee that `activate` stdout never overrides `HOME`/`TMPDIR`/`XDG_*`.

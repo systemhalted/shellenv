@@ -21,6 +21,7 @@ func resetCLIState() {
 	execWithProfile = false
 	execContainer = ""
 	execStrictShell = false
+	execEphemeral = false
 }
 
 func runCLI(t *testing.T, dir string, args ...string) (string, string, error) {
@@ -465,6 +466,60 @@ func TestActivateStrictShellErrors(t *testing.T) {
 	_, _, err := runCLI(t, dir, "activate", "--strict-shell", "--shell-type", "bash")
 	if err == nil || !strings.Contains(err.Error(), "bash@9.9") || !strings.Contains(err.Error(), "not installed") {
 		t.Fatalf("expected strict-shell missing-runtime error, got %v", err)
+	}
+}
+
+func TestActivateFishUsesFishProfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	profDir := filepath.Join(dir, "profiles")
+	if err := os.MkdirAll(profDir, 0o755); err != nil {
+		t.Fatalf("mkdir profiles: %v", err)
+	}
+	for name, content := range map[string]string{
+		"custom.fish": "# fish variant\n",
+		"custom.sh":   "set -euo pipefail\n",
+	} {
+		if err := os.WriteFile(filepath.Join(profDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if _, _, err := runCLI(t, dir, "create", "--shell", "fish", "--profile", "custom"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	stdout, stderr, err := runCLI(t, dir, "activate", "--shell-type", "fish")
+	if err != nil {
+		t.Fatalf("activate returned error: %v (stderr: %s)", err, stderr)
+	}
+	if !strings.Contains(stdout, "custom.fish") || !strings.Contains(stdout, "source") {
+		t.Fatalf("fish activation should source the .fish profile, got: %s", stdout)
+	}
+	if strings.Contains(stdout, "custom.sh") {
+		t.Fatalf("fish activation must not reference the POSIX profile, got: %s", stdout)
+	}
+}
+
+func TestActivateStdoutNeverOverridesHomeOrTmp(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash"); err != nil {
+		t.Fatalf("create returned error: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, dir, "activate", "--shell-type", "bash")
+	if err != nil {
+		t.Fatalf("activate returned error: %v", err)
+	}
+	// activate's contract: the eval'd snippet adjusts PATH/prompt/SHELLENV_*
+	// only — it must never redirect HOME/TMPDIR/XDG_* in the user's live
+	// shell (that isolation belongs to exec).
+	for _, forbidden := range []string{"HOME=", "TMPDIR=", "XDG_"} {
+		if strings.Contains(stdout, forbidden) {
+			t.Fatalf("activation snippet must not set %s, got: %s", forbidden, stdout)
+		}
 	}
 }
 

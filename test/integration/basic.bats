@@ -57,6 +57,22 @@ setup() {
   rm -rf proj-strict
 }
 
+@test "exec --ephemeral leaves no sandbox home behind" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+
+  run bash -lc 'mkdir -p proj-eph && cd proj-eph && '"$BIN"' create --shell bash@9.9'
+  [ "$status" -eq 0 ]
+
+  run bash -lc 'cd proj-eph && printf "#!/bin/sh\ntouch \"\$HOME/marker\"\necho \"HOME=\$HOME\"\n" > ./.shellenv/default/bin/homeprobe && chmod +x ./.shellenv/default/bin/homeprobe && '"$BIN"' exec --ephemeral -- homeprobe 2>/dev/null'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "home-ephemeral" ]]
+
+  run bash -lc 'ls proj-eph/.shellenv/default/ | grep home-ephemeral || echo clean'
+  [ "$output" = "clean" ]
+
+  rm -rf proj-eph
+}
+
 @test "exec with container" {
   [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
   which docker >/dev/null 2>&1 || skip "docker not found"

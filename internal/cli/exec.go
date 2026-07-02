@@ -18,6 +18,7 @@ var (
 	execWithProfile bool
 	execContainer   string
 	execStrictShell bool
+	execEphemeral   bool
 )
 
 func init() {
@@ -27,6 +28,8 @@ func init() {
 		"run the command inside the specified container image (e.g., ubuntu:22.04)")
 	execCmd.Flags().BoolVar(&execStrictShell, "strict-shell", false,
 		"require the declared shell runtime to be installed; fail instead of falling back to the system shell")
+	execCmd.Flags().BoolVar(&execEphemeral, "ephemeral", false,
+		"use a throwaway sandbox home that is removed after the command exits")
 	rootCmd.AddCommand(execCmd)
 }
 
@@ -70,9 +73,7 @@ var execCmd = &cobra.Command{
 			return fmt.Errorf("env %q not found at %s (run 'shellenv create' first)", envName, envDir)
 		}
 
-		// Metadata is optional today (corrupt-metadata hardening is R6);
-		// a missing file simply leaves the shell unpinned and profile unset.
-		md, _ := project.ReadMetadata(cwd, envName)
+		md := loadMetadata(cwd, envName)
 
 		// Resolve the declared shell runtime (host mode only: an installs
 		// path from the host is meaningless inside a container image).
@@ -109,8 +110,19 @@ var execCmd = &cobra.Command{
 		childEnv = upsertEnv(childEnv, "SHELLENV_ACTIVE", "1")
 
 		// Isolate HOME/TMPDIR/XDG so scripts write to a per-env sandbox rather
-		// than the user's real home or system temp dir.
+		// than the user's real home or system temp dir. With --ephemeral the
+		// sandbox is a throwaway dir removed after the child exits; it lives
+		// under the env dir (not the system temp) so it stays inside the
+		// workspace mount in container mode.
 		sandboxHome := project.SandboxHomeDir(cwd, envName)
+		if execEphemeral {
+			eph, err := os.MkdirTemp(envDir, "home-ephemeral-")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(eph)
+			sandboxHome = eph
+		}
 		tmpDir := filepath.Join(sandboxHome, "tmp")
 		xdgConfig := filepath.Join(sandboxHome, ".config")
 		xdgCache := filepath.Join(sandboxHome, ".cache")

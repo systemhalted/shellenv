@@ -29,6 +29,23 @@ func TestActivationCodeWithRuntimeBin(t *testing.T) {
 	}
 }
 
+func TestActivationCodeFishSourcesProfile(t *testing.T) {
+	envDir := filepath.Join("/proj", ".shellenv", "default")
+
+	fish := ActivationCodeWithOptions("fish", envDir, "default", ActivationOptions{
+		ProfilePath: "/profiles/strict.fish",
+	})
+	if !strings.Contains(fish, "source /profiles/strict.fish") {
+		t.Fatalf("fish activation should source the fish profile, got: %s", fish)
+	}
+
+	// Without a profile, no source statement appears.
+	plain := ActivationCodeWithOptions("fish", envDir, "default", ActivationOptions{})
+	if strings.Contains(plain, "source ") {
+		t.Fatalf("fish activation without profile must not source anything, got: %s", plain)
+	}
+}
+
 func TestActivationCode_AllowsUnsetPS1(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash not available")
