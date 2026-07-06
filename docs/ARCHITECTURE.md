@@ -5,13 +5,14 @@ shellenv provides per-project shell sandboxes so scripts can be exercised agains
 For the reasoning behind these choices (and known gaps), see `docs/DESIGN.md`.
 
 ## Isolation model
-shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberately uses no chroot, containers, namespaces, or syscalls. Isolation is achieved by four mechanisms, all confined to the child process (or to the shell session the user opts into via `eval`):
+shellenv is a **user-space sandbox**, not a security sandbox. Its default (host-mode) isolation needs no root, chroot, namespaces, or special syscalls — it is achieved by environment manipulation, confined to the child process (or to the shell session the user opts into via `eval`): `PATH`/runtime pinning, scoped `SHELLENV_*` vars, sourced option profiles, and redirecting `HOME`/`TMPDIR`/`XDG_*` at a per-env sandbox directory. One opt-in mode goes further: `exec --container <image>` delegates to Docker/Podman for real namespace isolation. The mechanisms:
 
 1. **`PATH` shimming**: the env's `bin/` is prepended to `PATH`, so project-local tools shadow system tools. `internal/cli/exec.go` (`prependPath`, `resolveCommandPath`, `isExecutable`) resolves the command manually against that modified `PATH`, honoring the hardened Go 1.19+ rule that ignores the current directory (`.`).
 2. **Scoped env vars**: `SHELLENV_ACTIVE=1` and `SHELLENV_ENV_NAME=<env>` are set in the child only — they never persist to the parent unless the user `eval`s the `activate` snippet.
 3. **Login shell untouched**: no `.bashrc`/`.zshrc`/`.profile` is read or written. Activation is opt-in (`eval "$(shellenv activate)"`) or one-off (`shellenv exec`).
-4. **Optional shell-option profiles**: `activate` may source a profile (`strict`/`posix`/`interactive`) to enforce shell options like `set -euo pipefail`.
-5. **Containerized execution option (`exec --container <image>`)**: when invoked, the command runs inside an isolated Docker/Podman container. The host workspace is mounted (`-v cwd:cwd`) and the working directory matches. The sandbox `$HOME` and `$TMPDIR` are passed as environment variables to keep file writes inside the host's sandbox folder, while providing the container's isolated network, filesystem, and process namespaces.
+4. **Sandboxed `HOME`/`TMPDIR`/`XDG_*`**: `exec` always (and `activate --isolate-home` on request) redirects these at a per-env sandbox (`./.shellenv/<env>/home/`), so a script's home and temp writes never land in the real `~`. `deactivate` restores an isolated session from write-once `SHELLENV_OLD_*` snapshots.
+5. **Optional shell-option profiles**: `activate` may source a profile (`strict`/`posix`/`interactive`) to enforce shell options like `set -euo pipefail`.
+6. **Containerized execution option (`exec --container <image>`)**: when invoked, the command runs inside an isolated Docker/Podman container. The host workspace is mounted (`-v cwd:cwd`) and the working directory matches. The sandbox `$HOME` and `$TMPDIR` are passed as environment variables to keep file writes inside the host's sandbox folder, while providing the container's isolated network, filesystem, and process namespaces.
 
 ### What is and isn't isolated
 | Concern | Isolated? | Notes |
@@ -37,7 +38,7 @@ shellenv is a **PATH-shimming sandbox**, not an OS-level sandbox. It deliberatel
 ## Layout and data
 - **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `cache/`, and `tmp/`. A `.initialized` marker is written as part of setup.
 - **Project envs** (`./.shellenv/<env>`): contain `metadata.json`, a `bin/` directory for project-local tools, and optional helper files (e.g., `activate.sh`). `shellenv create` scaffolds this structure; `shellenv use` records the current env in `./.shellenv/current`.
-- **Profiles**: sourced shell options under `profiles/` (built-ins: `strict`, `posix`, `interactive`). Overridable via `SHELLENV_PROFILES` or `./profiles/`.
+- **Profiles**: sourced shell options under `profiles/` (built-ins: `strict`, `posix`, `interactive`, each with a `.sh` and a `.fish` variant). Overridable via `SHELLENV_PROFILES` or `./profiles/`.
 
 ## Key packages and libraries
 - **Cobra (github.com/spf13/cobra)**: command-line framework used to define commands, flags, help text, and dispatch (`rootCmd` + subcommands under `internal/cli`). Each command’s `RunE` returns an error so non-zero exits propagate.

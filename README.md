@@ -7,7 +7,7 @@ Per-project shell sandboxes for testing scripts against specific shells and opti
 - Keep experiments contained: environments live under `./.shellenv/<name>` and `SHELLENV_HOME` (default `~/.shellenv`), avoiding edits to your login shell.
 - Make cross-shell QA easy: quickly swap between `bash`, `zsh`, `fish`, or POSIX-style profiles to catch portability issues early.
 
-> **Scope:** shellenv is a *PATH-shimming* sandbox for not polluting your own shell while you test scripts — not a security sandbox for untrusted code. See `docs/ARCHITECTURE.md` for exactly what is and isn't isolated.
+> **Scope:** shellenv is a *user-space* sandbox — it pins `PATH` and the shell runtime, and redirects `HOME`/`TMPDIR`/`XDG_*` writes to a per-env sandbox — for not polluting your own shell and home while you test scripts. It is **not** a security sandbox for untrusted code: network, processes, and the wider filesystem stay shared unless you run with `exec --container <image>`, which adds real namespace isolation. See `docs/ARCHITECTURE.md` for exactly what is and isn't isolated.
 
 ## Disclaimer
 This project is provided as-is with no warranties; use at your own risk. See `LICENSE` for details.
@@ -36,7 +36,7 @@ The examples below call the binary as `shellenv`; from a fresh checkout use `./d
 
 ## Concepts
 - **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `cache/`, and `tmp/`. Point it at a throwaway directory while experimenting to keep your real home pristine.
-- **Project envs** (`./.shellenv/<env>/`): created by `shellenv create`. Each holds `metadata.json` (declared shell + profile), a `bin/` directory for project-local tools, and a sandbox `home/` directory used by `exec` (below).
+- **Project envs** (`./.shellenv/<env>/`): created by `shellenv create`. Each holds `metadata.json` (declared shell + profile), a `bin/` directory for project-local tools, and a sandbox `home/` directory used by `exec` and `activate --isolate-home` (below).
 - **Profiles**: option presets sourced into the shell — built-ins `strict` (`set -euo pipefail`), `posix` (`set -o posix`), and `interactive`. Resolved via `SHELLENV_PROFILES` → `./profiles/<name>.sh` → next to the binary. Fish sessions source a `<name>.fish` variant instead (fish can't source POSIX scripts, and has no `set -e` equivalent — the built-in fish variants only carry comments/exports).
 
 ## Quick start

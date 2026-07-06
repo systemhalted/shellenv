@@ -6,9 +6,10 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 - `cmd/shellenv`: CLI entrypoint.
 - `internal/cli`: Cobra commands (`init`, `create`, `activate`, `use`, etc.).
 - `internal/env`: Resolves `$SHELLENV_HOME` or `~/.shellenv`; ensures subdirectories (`installs/`, `cache/`, `tmp/`); resolves declared shell runtimes under `installs/`.
+- `internal/installer`: Downloads, verifies, and builds shell runtimes from official source tarballs.
 - `internal/project`: Per-project metadata under `./.shellenv/<env>/`.
 - `internal/shell`: Activation/profile handling.
-- `profiles/`: Option presets (`strict.sh`, `posix.sh`, `interactive.sh`).
+- `profiles/`: Option presets (`strict`, `posix`, `interactive`; `.sh` plus `.fish` variants).
 - `test/`: Integration tests in `test/integration`; Go unit tests live next to code in `internal/*`.
 
 ## Build, Test, and Development Commands
@@ -30,14 +31,14 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 
 ## Documentation
 - Primary docs live in README.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, docs/DESIGN.md, and docs/Task.md. Add new docs under docs/ only when needed; get maintainer buy-in and link them from README.md.
-- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = architecture, flows, sequences; docs/DESIGN.md = design decisions and roadmap; docs/Task.md = AI task log for completed work; add release notes/changelog to docs/ when we start versioning.
+- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = architecture, flows, sequences; docs/DESIGN.md = design decisions and roadmap; docs/Task.md = AI task log for completed work; release notes are published on GitHub Releases (tag-triggered `release.yml`).
 - Update docs whenever behavior changes: new/changed commands, flags, env vars, profiles, activation logic, or config defaults; keep examples in sync.
 - Style/ownership: short headings, concise sentences, consistent formatting; a reviewer must sign off doc updates that accompany behavior changes.
 - Always update the necessary files after completion of work and before the code is committed and pushed to the remote repo.
 
 
 ## Commit & Pull Request Guidelines
-- Use concise, imperative commit messages (e.g., `Add profile resolver guard`, `Tighten activation prompt formatting`). No history exists yet, so set the tone.
+- Use concise, imperative commit messages (e.g., `Add profile resolver guard`, `Tighten activation prompt formatting`), matching the existing history.
 - PRs should describe behavior changes, include reproduction/verification steps (`make build`, `make test`, `bats -r test/integration`), and note any env vars or new flags.
 - Add tests with new features or bug fixes; call out gaps explicitly if something cannot be covered.
 

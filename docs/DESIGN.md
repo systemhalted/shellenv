@@ -15,8 +15,10 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
 - **Trade-off**: The isolation boundary is weak. `HOME`, `/tmp`, network, processes, and
   inherited env vars all leak to the host (see the boundary table in `ARCHITECTURE.md`).
   Not safe for untrusted code.
-- **Status**: Current and foundational. P0 roadmap items tighten the boundary (HOME/TMPDIR)
-  without abandoning this model.
+- **Status**: Current and foundational, with the boundary since tightened without abandoning
+  the model: R1/R7 redirect `HOME`/`TMPDIR`/`XDG_*` at a per-env sandbox, and decision 10
+  adds an opt-in container driver for workloads that genuinely need namespace isolation.
+  "PATH-shimming" now names the default host mode, not the whole tool.
 
 ## 2. Per-project `./.shellenv/<env>/` + global `SHELLENV_HOME` split
 - **Decision**: Keep project-scoped config (`metadata.json`, `bin/`, `current`) inside the
@@ -63,9 +65,10 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   resolved via `SHELLENV_PROFILES` → `./profiles/<name>.sh` → alongside the binary.
 - **Why**: Users can add or override profiles with zero recompilation, and the contents are
   exactly the shell options they'd write by hand (`set -euo pipefail`, `set -o posix`).
-- **Trade-off**: Profiles are shell-specific. Fish can't `source` POSIX scripts, so fish
-  currently gets no profile (a documented limitation).
-- **Status**: Current; fish support is on the roadmap.
+- **Trade-off**: Profiles are shell-specific. Fish can't `source` POSIX scripts, so each
+  built-in ships a `.fish` variant that fish sessions source instead (R6); fish has no
+  `set -e`/`pipefail` equivalents, so its strict/posix variants carry only comments/exports.
+- **Status**: Current; fish variants landed in R6.
 
 ## 7. `internal/` package split (`env` / `project` / `shell` / `cli`)
 - **Decision**: `cli` orchestrates commands; `env` owns `SHELLENV_HOME` resolution;
@@ -116,10 +119,11 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   `$SHELLENV_HOME/installs/<shell>/<version>/bin` via `env.ResolveRuntime` and prepend it to
   PATH *after* the env's `bin/`. A declared-but-uninstalled runtime produces a stderr warning
   and falls back to the system shell; `--strict-shell` makes it a hard error instead.
-- **Why**: Installers are placeholders until R5, so hard-erroring on a missing runtime would
-  break every `create → exec` workflow that exists today. The warning ends the previous
-  silent fallback; the flag gives users who want enforced pinning the roadmap's strict
-  behavior. Opt-in-flag precedent: `exec --profile` (R2). Env bin stays first on PATH so
+- **Why**: When this landed, installers were still placeholders (pre-R5), so hard-erroring on
+  a missing runtime would have broken every `create → exec` workflow. The rationale outlives
+  R5: a fresh checkout with a declared version but no `install` run yet should still work.
+  The warning ends the previous silent fallback; the flag gives users who want enforced
+  pinning the strict behavior. Opt-in-flag precedent: `exec --profile` (R2). Env bin stays first on PATH so
   project-local tools keep their existing precedence.
 - **Trade-off**: A warning is easier to miss than an error. `--strict-shell` with an
   unversioned declaration (`shell` without `@version`) also errors — strictness that silently
