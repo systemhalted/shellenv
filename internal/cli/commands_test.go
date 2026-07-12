@@ -691,8 +691,10 @@ func TestActivateIncludesRuntimeBinWhenInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("activate returned error: %v (stderr: %s)", err, stderr)
 	}
+	// The CLI derives paths from os.Getwd(), which resolves symlinks — on
+	// macOS t.TempDir() lives under the /var -> /private/var symlink.
 	runtimeBin := filepath.Join(home, "installs", "bash", "5.2", "bin")
-	envBin := filepath.Join(project.EnvDir(dir, "default"), "bin")
+	envBin := filepath.Join(project.EnvDir(realpath(t, dir), "default"), "bin")
 	if !strings.Contains(stdout, "PATH="+envBin+":"+runtimeBin+":$PATH") {
 		t.Fatalf("expected PATH with env bin then runtime bin, got: %s", stdout)
 	}
@@ -800,7 +802,9 @@ func TestActivateIsolateHomeEmitsSandboxExports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("activate --isolate-home returned error: %v (stderr: %s)", err, stderr)
 	}
-	sandbox := project.SandboxHomeDir(dir, "default")
+	// Emitted paths come from os.Getwd(), which resolves the macOS
+	// /var -> /private/var symlink under t.TempDir().
+	sandbox := project.SandboxHomeDir(realpath(t, dir), "default")
 	if !strings.Contains(stdout, "export HOME="+sandbox) {
 		t.Fatalf("expected HOME redirect to %s, got: %s", sandbox, stdout)
 	}

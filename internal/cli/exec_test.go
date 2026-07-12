@@ -567,6 +567,10 @@ func TestExecWithContainerCLI(t *testing.T) {
 		t.Errorf("expected 'run', got %s", args[0])
 	}
 
+	// exec derives the mount/workdir from os.Getwd(), which resolves the
+	// macOS /var -> /private/var symlink under t.TempDir().
+	cwd := realpath(t, dir)
+
 	hasRm := false
 	hasVolume := false
 	hasWorkdir := false
@@ -578,10 +582,10 @@ func TestExecWithContainerCLI(t *testing.T) {
 		if arg == "--rm" {
 			hasRm = true
 		}
-		if strings.HasPrefix(arg, "-v") || strings.Contains(arg, fmt.Sprintf("%s:%s", dir, dir)) {
+		if strings.HasPrefix(arg, "-v") || strings.Contains(arg, fmt.Sprintf("%s:%s", cwd, cwd)) {
 			hasVolume = true
 		}
-		if arg == dir {
+		if arg == cwd {
 			hasWorkdir = true
 		}
 		if arg == "alpine" {
