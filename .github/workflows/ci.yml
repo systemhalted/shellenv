@@ -6,13 +6,20 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
+      # go.mod pins the declared minimum (1.22); this job proves the module
+      # still builds and passes on it. The lint job runs on stable instead.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -35,8 +42,43 @@ jobs:
       - name: build
         run: make build
 
-      - name: install bats
+      - name: install bats (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y bats
 
-      - name: integration tests
+      - name: install bats (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bats-core
+
+      - name: docker diagnostic (Linux)
+        if: runner.os == 'Linux'
+        run: docker version
+
+      # On Linux the runner ships docker, so the container test must RUN, not
+      # silently skip — SHELLENV_TEST_REQUIRE_CONTAINER enforces that. macOS
+      # runners have no docker; the test skips gracefully there.
+      - name: integration tests (Linux)
+        if: runner.os == 'Linux'
+        run: SHELLENV_HOME=$(mktemp -d) SHELLENV_TEST_REQUIRE_CONTAINER=1 bats -r test/integration
+
+      - name: integration tests (macOS)
+        if: runner.os == 'macOS'
         run: SHELLENV_HOME=$(mktemp -d) bats -r test/integration
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # staticcheck/govulncheck need a recent toolchain, and govulncheck's
+      # stdlib scan is only meaningful against the newest patch release.
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: lint
+        run: make lint
+
+      - name: govulncheck
+        run: make vulncheck

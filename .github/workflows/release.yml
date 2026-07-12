@@ -8,14 +8,24 @@ permissions:
   contents: write
 
 jobs:
+  # Nothing ships untested: a tag runs the full CI (both OSes + lint/vulncheck)
+  # before any artifact is built.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
+      # Build releases with the newest stable Go so shipped binaries carry
+      # current stdlib security fixes; go.mod's 1.22 stays the source-build
+      # minimum and is verified by the test job.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
 
       # Each tarball ships profiles/ beside the binary — the third leg of
       # shell.ResolveProfile's lookup — so an extracted dir works standalone.

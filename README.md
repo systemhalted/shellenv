@@ -182,7 +182,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - Task notes and change log: `docs/Task.md`.
 
 ## Testing & dev notes
-- Unit tests: `make test`.
-- Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`. The real-source-build test is skipped unless `SHELLENV_TEST_REAL_INSTALL=1` is set (network + several minutes).
+- Unit tests: `make test`. Lint and vulnerability scan: `make lint` / `make vulncheck` (need a recent Go toolchain; versions pinned in the Makefile).
+- Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`. The real-source-build test is skipped unless `SHELLENV_TEST_REAL_INSTALL=1` is set (network + several minutes). The container test skips when no docker/podman is found — set `SHELLENV_TEST_REQUIRE_CONTAINER=1` (CI does, on Linux) to make that a failure instead.
 - If your environment restricts the default Go cache, use a repo-local one: `GOCACHE=$PWD/.cache/go-build go test ./...`.
 - Keep experiments isolated by pointing `SHELLENV_HOME` at a temp directory when hacking on the tool.

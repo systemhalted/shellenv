@@ -109,7 +109,16 @@ setup() {
 
 @test "exec with container" {
   [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
-  which docker >/dev/null 2>&1 || skip "docker not found"
+  # Same engines findContainerEngine accepts. SHELLENV_TEST_REQUIRE_CONTAINER=1
+  # (set in CI on Linux) turns a silent skip into a failure so the container
+  # path can't quietly stop being tested.
+  if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then
+    if [ -n "${SHELLENV_TEST_REQUIRE_CONTAINER:-}" ]; then
+      echo "container engine required (SHELLENV_TEST_REQUIRE_CONTAINER=1) but none found" >&2
+      return 1
+    fi
+    skip "no container engine (docker/podman) found"
+  fi
 
   run bash -lc 'mkdir -p proj-container && cd proj-container && '"$BIN"' create --shell bash@5.2'
   [ "$status" -eq 0 ]

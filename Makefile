@@ -2,7 +2,12 @@ SHELL := /bin/bash
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build test itest
+# Pinned here (not in CI) so local runs and CI always agree. Both tools need a
+# recent Go toolchain to build; the module itself still targets go 1.22.
+STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.7.0
+GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.6.0
+
+.PHONY: build test itest lint vulncheck
 
 build:
 	mkdir -p dist
@@ -15,3 +20,13 @@ test:
 # them off the real ~/.shellenv.
 itest: build
 	SHELLENV_HOME=$$(mktemp -d) bats -r test/integration
+
+lint:
+	@out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt needed on:"; echo "$$out"; exit 1; fi
+	go vet ./...
+	go run $(STATICCHECK) ./...
+
+# Scans with the running toolchain's stdlib: a finding fixed in a newer Go
+# patch release means "update your toolchain", per the blocking-gate policy.
+vulncheck:
+	go run $(GOVULNCHECK) ./...
