@@ -5,7 +5,7 @@ Per-project shell sandboxes for testing scripts against specific shells and opti
 ## Intent
 - Treat shells like runtimes: declare the shell version and profile a project expects, and run commands inside that sandbox.
 - Keep experiments contained: environments live under `./.shellenv/<name>` and `SHELLENV_HOME` (default `~/.shellenv`), avoiding edits to your login shell.
-- Make cross-shell QA easy: quickly swap between `bash`, `zsh`, `fish`, or POSIX-style profiles to catch portability issues early.
+- Make cross-shell QA easy: pin and swap `bash`/`zsh` runtimes and POSIX-style option profiles to catch portability issues early. `fish` sessions are supported for activation and profiles (`--shell-type fish`, `.fish` profile variants), but shellenv does not install fish itself.
 
 > **Scope:** shellenv is a *user-space* sandbox — it pins `PATH` and the shell runtime, and redirects `HOME`/`TMPDIR`/`XDG_*` writes to a per-env sandbox — for not polluting your own shell and home while you test scripts. It is **not** a security sandbox for untrusted code: network, processes, and the wider filesystem stay shared unless you run with `exec --container <image>`, which adds real namespace isolation. See `docs/ARCHITECTURE.md` for exactly what is and isn't isolated.
 
@@ -147,7 +147,7 @@ shellenv exec --strict-shell -- ./run-tests.sh
 # error: declared shell "bash@5.2" is not installed (run 'shellenv install bash@5.2', or omit --strict-shell)
 ```
 
-`shellenv install` builds the runtime from the official source tarball: it downloads into `$SHELLENV_HOME/cache/`, verifies the SHA-256 for pinned versions (`bash@5.2`, `zsh@5.9` — other versions install with an unverified-download warning), and runs `configure`/`make`/`make install` (a few minutes, once per version; build output lands in a `build.log` if anything fails). This needs `cc`/`gcc`, `make`, and `tar` — run `shellenv doctor` to check. Supported today: **bash** and **zsh**.
+`shellenv install` builds the runtime from the official source tarball: it downloads into `$SHELLENV_HOME/cache/`, verifies the SHA-256 for pinned versions (`bash@5.2`, `zsh@5.9` — other versions install with an unverified-download warning; pass `--require-checksum` to fail instead of warning, before anything is downloaded), and runs `configure`/`make`/`make install` (a few minutes, once per version; build output lands in a `build.log` if anything fails). This needs `cc`/`gcc`, `make`, and `tar` — run `shellenv doctor` to check. Supported today: **bash** and **zsh**.
 
 **Caveat:** resolution is host-only — `exec --container` skips it (pick an image that provides the shell) and rejects `--strict-shell`.
 
@@ -166,7 +166,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - `shellenv deactivate [--shell-type bash|zsh|fish]`: print a snippet restoring the session (PATH, prompt, isolated vars, `SHELLENV_*`).
 - `shellenv exec [<env>] [--profile] [--strict-shell] [--ephemeral] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). `--ephemeral` swaps the persistent sandbox home for a throwaway one deleted after the run. If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
-- `shellenv install <shell>@<ver>` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`), remove one, or list what's installed.
+- `shellenv install <shell>@<ver> [--require-checksum]` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`; `--require-checksum` refuses versions without a pinned SHA-256), remove one, or list what's installed.
 - `shellenv doctor`: quick health check of the global home and the build toolchain `install` needs.
 
 ## Environment variables

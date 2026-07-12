@@ -9,7 +9,12 @@ import (
 	"github.com/systemhalted/shellenv/internal/installer"
 )
 
-func init() { rootCmd.AddCommand(installCmd) }
+var installRequireChecksum bool
+
+func init() {
+	installCmd.Flags().BoolVar(&installRequireChecksum, "require-checksum", false, "fail instead of warning when the version has no pinned checksum")
+	rootCmd.AddCommand(installCmd)
+}
 
 var installCmd = &cobra.Command{
 	Use:   "install <shell>@<version>",
@@ -25,7 +30,9 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		prefix, err := installer.New(home, os.Stdout).Install(name, version)
+		inst := installer.New(home, os.Stdout)
+		inst.RequireChecksum = installRequireChecksum
+		prefix, err := inst.Install(name, version)
 		if err != nil {
 			return err
 		}

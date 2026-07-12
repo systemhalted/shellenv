@@ -79,15 +79,15 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
 - **Trade-off**: Some indirection for a small codebase.
 - **Status**: Current.
 
-## 8. Runtime installers are deliberately placeholders (for now)
-- **Decision**: `install`/`uninstall`/`versions` create/remove directory structure under
-  `$SHELLENV_HOME/installs/` and write a `placeholder runtime` marker, without actually
-  provisioning a shell.
-- **Why**: Real shell provisioning (download/build of pinned versions) is the hard part and
+## 8. Runtime installers began as placeholders (superseded — see decision 13)
+- **Decision**: `install`/`uninstall`/`versions` originally created/removed directory
+  structure under `$SHELLENV_HOME/installs/` and wrote a `placeholder runtime` marker,
+  without actually provisioning a shell.
+- **Why**: Real shell provisioning (download/build of pinned versions) was the hard part and
   was staged for later so the rest of the workflow (create/activate/exec/profiles) could
   ship and be exercised first.
-- **Trade-off**: The headline "declare and pin a shell version" promise isn't fully real yet —
-  the declared version is recorded but never resolved.
+- **Trade-off**: While this held, the headline "declare and pin a shell version" promise
+  wasn't fully real — the declared version was recorded but never resolved.
 - **Status**: Superseded by decision 13 (R5): `install` now builds real runtimes from source.
 
 ## 9. Silence Cobra's usage/error output; report errors centrally
@@ -161,7 +161,9 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   out to system `tar` (handles gz and xz) to avoid growing the dependency tree.
 - **Trade-off**: Installs need network, a compiler toolchain, and minutes of build time —
   paid once per version. Versions without a pinned checksum install with a loud warning
-  rather than failing, mirroring the warn-don't-break stance of decision 11; a mismatch
+  rather than failing, mirroring the warn-don't-break stance of decision 11;
+  `install --require-checksum` is the strict opt-in that refuses instead (same pattern as
+  `--strict-shell`), and it refuses before downloading. A mismatch
   against a pinned checksum always fails and removes the corrupt download. Real builds are
   exercised by an opt-in bats test (`SHELLENV_TEST_REAL_INSTALL=1`); the default suites stub
   the network and toolchain.

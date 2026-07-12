@@ -57,6 +57,10 @@ type Installer struct {
 	Fetch    func(url, dest string) error
 	LookPath func(file string) (string, error)
 
+	// RequireChecksum refuses to install versions without a pinned checksum
+	// instead of warning (the strict opt-in, mirroring --strict-shell).
+	RequireChecksum bool
+
 	pinned map[string]string // overridable in tests; nil means pinnedChecksums
 }
 
@@ -89,6 +93,11 @@ func (in *Installer) Install(shell, version string) (string, error) {
 	if _, err := os.Stat(filepath.Join(prefix, "bin", shell)); err == nil {
 		fmt.Fprintf(in.Out, "%s@%s is already installed at %s\n", shell, version, prefix)
 		return prefix, nil
+	}
+
+	// Refuse before preflight and download: don't fetch what we won't trust.
+	if src.SHA256 == "" && in.RequireChecksum {
+		return "", fmt.Errorf("no pinned checksum for %s@%s; refusing unverified install (omit --require-checksum to proceed with a warning)", shell, version)
 	}
 
 	if err := in.preflight(); err != nil {
@@ -182,7 +191,7 @@ func (in *Installer) download(src Source) (string, error) {
 		}
 	}
 	if src.SHA256 == "" {
-		fmt.Fprintf(in.Out, "warning: no pinned checksum for this version; the download is unverified\n")
+		fmt.Fprintf(in.Out, "warning: no pinned checksum for this version; the download is unverified (use --require-checksum to refuse instead)\n")
 		return dest, nil
 	}
 	sum, err := fileSHA256(dest)

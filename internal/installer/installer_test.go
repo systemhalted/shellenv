@@ -148,6 +148,40 @@ func TestInstallAcceptsCorrectPinnedChecksum(t *testing.T) {
 	}
 }
 
+func TestInstallRequireChecksumRejectsUnpinned(t *testing.T) {
+	home := t.TempDir()
+	in, cmds, fetched := fakeInstaller(t, home)
+	var lookups []string
+	in.LookPath = func(file string) (string, error) {
+		lookups = append(lookups, file)
+		return "/usr/bin/" + file, nil
+	}
+	in.RequireChecksum = true
+
+	_, err := in.Install("bash", "5.1")
+	if err == nil || !strings.Contains(err.Error(), "checksum") {
+		t.Fatalf("expected refusing-unverified error, got %v", err)
+	}
+	// Refusal must happen before preflight and download: nothing touched.
+	if len(*cmds) != 0 || len(*fetched) != 0 || len(lookups) != 0 {
+		t.Fatalf("no externals may run on refusal (cmds=%v fetched=%v lookups=%v)", *cmds, *fetched, lookups)
+	}
+}
+
+func TestInstallRequireChecksumAcceptsPinned(t *testing.T) {
+	home := t.TempDir()
+	in, _, _ := fakeInstaller(t, home)
+	content := []byte("good-tarball")
+	sum := sha256.Sum256(content)
+	in.Fetch = func(url, dest string) error { return os.WriteFile(dest, content, 0o644) }
+	in.pinned = map[string]string{"bash@5.1": hex.EncodeToString(sum[:])}
+	in.RequireChecksum = true
+
+	if _, err := in.Install("bash", "5.1"); err != nil {
+		t.Fatalf("install with pinned checksum and --require-checksum failed: %v", err)
+	}
+}
+
 func TestInstallSkipsWhenAlreadyInstalled(t *testing.T) {
 	home := t.TempDir()
 	in, cmds, fetched := fakeInstaller(t, home)

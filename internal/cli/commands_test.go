@@ -23,6 +23,7 @@ func resetCLIState() {
 	execContainer = ""
 	execStrictShell = false
 	execEphemeral = false
+	installRequireChecksum = false
 }
 
 func runCLI(t *testing.T, dir string, args ...string) (string, string, error) {
@@ -160,6 +161,17 @@ func TestInstallSkipsAlreadyInstalledRuntime(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "already installed") {
 		t.Fatalf("expected already-installed message, got: %s", stdout)
+	}
+}
+
+func TestInstallRequireChecksumRejectsUnpinnedVersion(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
+
+	// bash@9.9 has no pinned checksum; the refusal happens before preflight
+	// and download, so this test needs no toolchain or network.
+	_, _, err := runCLI(t, "", "install", "--require-checksum", "bash@9.9")
+	if err == nil || !strings.Contains(err.Error(), "no pinned checksum") {
+		t.Fatalf("expected refusing-unverified error, got %v", err)
 	}
 }
 
@@ -323,6 +335,21 @@ func TestCreateWritesMetadataAndActivate(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "demo") {
 		t.Fatalf("expected env name in output, got: %s", stdout)
+	}
+}
+
+func TestCreateFailsWhenActivateScriptUnwritable(t *testing.T) {
+	dir := t.TempDir()
+
+	// Pre-create activate.sh as a directory so the WriteFile in create fails
+	// deterministically (even when running as root, unlike chmod tricks).
+	if err := os.MkdirAll(filepath.Join(project.EnvDir(dir, "default"), "activate.sh"), 0o755); err != nil {
+		t.Fatalf("mkdir activate.sh: %v", err)
+	}
+
+	_, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2")
+	if err == nil || !strings.Contains(err.Error(), "activate.sh") {
+		t.Fatalf("expected activate.sh write error, got %v", err)
 	}
 }
 
