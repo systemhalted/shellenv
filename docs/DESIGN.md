@@ -190,6 +190,22 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   restored from outside the shell. All documented in README.
 - **Status**: Current.
 
+## 15. Global env registry is advisory (`$SHELLENV_HOME/registry.json`)
+- **Decision**: `create` and `destroy` record/remove env locations in a JSON registry under
+  `SHELLENV_HOME` (`internal/registry`: version + `(root, name, shell, registered)` entries,
+  upserted sorted, written atomically via temp-file + rename). `uninstall` and `list --all`
+  consult it, re-validating every entry against the project's `metadata.json` on disk —
+  never the cached `shell` field — and silently pruning entries whose project vanished.
+- **Why**: `uninstall`'s in-use warning previously saw only the current directory's envs; a
+  central index makes the warning cross-project without scanning the filesystem, and gives
+  `list --all` a way to show every known env.
+- **Trade-off**: The registry is best-effort by design and can under-report — envs created
+  before it existed, moved projects, and concurrent writers (last-writer-wins, no locking)
+  all leave gaps. It is never load-bearing: no command fails on a missing/corrupt/unwritable
+  registry (callers warn on stderr and continue), the cwd scan in `uninstall` remains, and
+  registry-sourced warnings stay warnings.
+- **Status**: Current.
+
 ---
 
 # Roadmap (gap-closing)

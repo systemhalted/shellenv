@@ -38,6 +38,7 @@ func init() {
 			if err := os.WriteFile(filepath.Join(project.EnvDir(cwd, createName), "activate.sh"), []byte("eval \"$(shellenv activate)\"\n"), 0o755); err != nil {
 				return fmt.Errorf("writing activate.sh: %w", err)
 			}
+			registerEnvBestEffort(cwd, md)
 			fmt.Printf("Created env %q for shell %s at %s\n", createName, createShell, project.EnvDir(cwd, createName))
 			return nil
 		},

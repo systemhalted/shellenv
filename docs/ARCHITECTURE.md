@@ -36,7 +36,7 @@ shellenv is a **user-space sandbox**, not a security sandbox. Its default (host-
 - **Not for**: sandboxing untrusted or malicious code. A hostile script can still reach the network, read secrets from the environment, and touch the real filesystem.
 
 ## Layout and data
-- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `cache/`, and `tmp/`. A `.initialized` marker is written as part of setup.
+- **Global home** (`SHELLENV_HOME`, default `~/.shellenv`): created by `shellenv init` with `installs/`, `cache/`, and `tmp/`. A `.initialized` marker is written as part of setup. `registry.json` (maintained by `create`/`destroy`) is an advisory index of project env locations used by `uninstall` warnings and `list --all`.
 - **Project envs** (`./.shellenv/<env>`): contain `metadata.json`, a `bin/` directory for project-local tools, and optional helper files (e.g., `activate.sh`). `shellenv create` scaffolds this structure; `shellenv use` records the current env in `./.shellenv/current`.
 - **Profiles**: sourced shell options under `profiles/` (built-ins: `strict`, `posix`, `interactive`, each with a `.sh` and a `.fish` variant). Overridable via `SHELLENV_PROFILES` or `./profiles/`.
 
@@ -47,6 +47,7 @@ shellenv is a **user-space sandbox**, not a security sandbox. Its default (host-
 - `internal/env`: resolves and prepares `SHELLENV_HOME`; resolves declared shell runtimes under `installs/`.
 - `internal/installer`: downloads, verifies, and builds shell runtimes from official source tarballs.
 - `internal/project`: per-project metadata reading/writing, env listing, and current-env tracking.
+- `internal/registry`: advisory index of project envs under `$SHELLENV_HOME/registry.json` (atomic writes, best-effort semantics — no command fails on registry errors).
 - `internal/shell`: activation snippet generation and profile resolution.
 
 ## Command flows
@@ -55,9 +56,9 @@ shellenv is a **user-space sandbox**, not a security sandbox. Its default (host-
 - **activate**: picks an env (arg → `./.shellenv/current` → `default`), verifies it exists, resolves the profile (`SHELLENV_PROFILES` → `./profiles` → alongside the binary) and the declared shell runtime (`$SHELLENV_HOME/installs/<shell>/<version>/bin`, warning on stderr if declared but missing; `--strict-shell` errors instead), and prints shell code that saves PATH/PS1 into write-once `SHELLENV_OLD_*` vars, sets `SHELLENV_ACTIVE=1`, `SHELLENV_ENV_NAME`, prepends `bin/` (then the runtime bin) to `PATH`, and prefixes the prompt. With `--isolate-home` it also pre-creates the env sandbox (`project.EnsureSandboxDirs`) and redirects `HOME`/`TMPDIR`/`XDG_*` at it (saved the same way).
 - **deactivate**: prints guard-everything shell code restoring the session — PATH/PS1 from the `SHELLENV_OLD_*` snapshots, `HOME`/`TMPDIR`/`XDG_*` when they were redirected, then unsets all `SHELLENV_*`. A silent no-op when nothing is active.
 - **exec**: uses the same env selection as `activate`, builds a child env with `bin/` prepended (followed by the declared shell's installs bin when resolved — same warning/`--strict-shell` behavior as `activate`) and `SHELLENV_*` vars set, and additionally redirects `HOME`/`TMPDIR`/`XDG_*` to a per-env sandbox (`./.shellenv/<env>/home/`) so scripts don't write to the real home. Under host execution (default), if `--profile` is used, it runs the command *inside* the declared shell after sourcing the env's profile. Under containerized execution (`--container <image>`), it detects the container CLI engine (`docker` or `podman`), mounts the workspace (`-v cwd:cwd`), aligns the working directory, forwards the sandboxed environment variables, and executes the target command wrapped in `sh -c` inside the container to prepend the sandbox `bin/` and source profiles if requested. The child's exit code is mirrored exactly as shellenv's own exit status.
-- **install/uninstall/versions**: `install` builds real runtimes from official source tarballs (`internal/installer`: download to `cache/` → SHA-256 verify against pinned checksums → `./configure --prefix=… && make && make install` in `tmp/build-…/` with a `build.log`). Supported: bash, zsh. `uninstall` removes the runtime dir; `versions` lists installed ones.
+- **install/uninstall/versions**: `install` builds real runtimes from official source tarballs (`internal/installer`: download to `cache/` → SHA-256 verify against pinned checksums, `--require-checksum` refusing unpinned versions → `./configure --prefix=… && make && make install` in `tmp/build-…/` with a `build.log`). Supported: bash, zsh. `uninstall` removes the runtime dir and warns about envs still declaring the version (current directory scan + registry entries re-validated against `metadata.json`, pruning vanished projects); `versions` lists installed ones.
 - **which**: resolves a binary preferring the env `bin/` folder.
-- **destroy/list**: remove or enumerate project envs under `./.shellenv`.
+- **destroy/list**: remove or enumerate project envs under `./.shellenv`; both maintain the registry (`destroy` unregisters, `list --all` also shows validated registry entries as `NAME  SHELL  ROOT`).
 
 ### Command selection details
 - **Env selection**: `activate`/`exec` pick env → CLI arg > `./.shellenv/current` > `default`.

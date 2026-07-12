@@ -24,6 +24,7 @@ var destroyCmd = &cobra.Command{
 		if err := os.RemoveAll(pdir); err != nil {
 			return err
 		}
+		unregisterEnvBestEffort(cwd, name)
 		fmt.Printf("Destroyed env %q\n", name)
 		return nil
 	},

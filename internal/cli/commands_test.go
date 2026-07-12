@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/systemhalted/shellenv/internal/project"
+	"github.com/systemhalted/shellenv/internal/registry"
 )
 
 func resetCLIState() {
@@ -24,6 +25,18 @@ func resetCLIState() {
 	execStrictShell = false
 	execEphemeral = false
 	installRequireChecksum = false
+	listAll = false
+}
+
+// realpath resolves symlinks so paths compare equal to what os.Getwd (and so
+// the registry's Root field) reports for a t.TempDir.
+func realpath(t *testing.T, dir string) string {
+	t.Helper()
+	p, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatalf("evalsymlinks %s: %v", dir, err)
+	}
+	return p
 }
 
 func runCLI(t *testing.T, dir string, args ...string) (string, string, error) {
@@ -292,6 +305,7 @@ func TestVersionsListsInstalledRuntimes(t *testing.T) {
 }
 
 func TestCreateRequiresShellFlag(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	_, _, err := runCLI(t, dir, "create")
@@ -301,6 +315,7 @@ func TestCreateRequiresShellFlag(t *testing.T) {
 }
 
 func TestCreateWritesMetadataAndActivate(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	stdout, stderr, err := runCLI(t, dir, "create", "--name", "demo", "--shell", "bash@5.2", "--profile", "interactive")
@@ -339,6 +354,7 @@ func TestCreateWritesMetadataAndActivate(t *testing.T) {
 }
 
 func TestCreateFailsWhenActivateScriptUnwritable(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	// Pre-create activate.sh as a directory so the WriteFile in create fails
@@ -350,6 +366,160 @@ func TestCreateFailsWhenActivateScriptUnwritable(t *testing.T) {
 	_, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2")
 	if err == nil || !strings.Contains(err.Error(), "activate.sh") {
 		t.Fatalf("expected activate.sh write error, got %v", err)
+	}
+}
+
+func TestCreateRegistersEnv(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dir := t.TempDir()
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	f, err := registry.Load(home)
+	if err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	if len(f.Envs) != 1 {
+		t.Fatalf("expected 1 registry entry, got %+v", f.Envs)
+	}
+	e := f.Envs[0]
+	if e.Root != realpath(t, dir) || e.Name != "default" || e.Shell != "bash@5.2" || e.Registered == "" {
+		t.Fatalf("unexpected entry: %+v", e)
+	}
+}
+
+func TestDestroyUnregistersEnv(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dir := t.TempDir()
+
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := runCLI(t, dir, "destroy", "default"); err != nil {
+		t.Fatalf("destroy: %v", err)
+	}
+
+	f, err := registry.Load(home)
+	if err != nil || len(f.Envs) != 0 {
+		t.Fatalf("expected empty registry after destroy, got %+v, %v", f.Envs, err)
+	}
+}
+
+func TestUninstallWarnsAcrossProjectsViaRegistry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+
+	if _, _, err := runCLI(t, dirA, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Uninstall from an unrelated directory: only the registry can reveal dirA.
+	_, stderr, err := runCLI(t, dirB, "uninstall", "bash@5.2")
+	if err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	if !strings.Contains(stderr, realpath(t, dirA)) || !strings.Contains(stderr, "default") {
+		t.Fatalf("expected cross-project warning naming %s, got: %s", dirA, stderr)
+	}
+}
+
+func TestUninstallPrunesStaleRegistryEntries(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+
+	if _, _, err := runCLI(t, dirA, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// The project vanishes without a destroy (deleted repo, moved disk...).
+	if err := os.RemoveAll(filepath.Join(dirA, ".shellenv")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, err := runCLI(t, dirB, "uninstall", "bash@5.2")
+	if err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	if strings.Contains(stderr, realpath(t, dirA)) {
+		t.Fatalf("stale env must not be warned about, got: %s", stderr)
+	}
+	f, err := registry.Load(home)
+	if err != nil || len(f.Envs) != 0 {
+		t.Fatalf("stale entry should be pruned, got %+v, %v", f.Envs, err)
+	}
+}
+
+func TestListAllShowsRegisteredEnvsAndOmitsStale(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+	dirC := t.TempDir()
+
+	for _, d := range []string{dirA, dirB, dirC} {
+		if _, _, err := runCLI(t, d, "create", "--shell", "bash@5.2"); err != nil {
+			t.Fatalf("create in %s: %v", d, err)
+		}
+	}
+	// dirC's project vanishes; list --all must omit it.
+	if err := os.RemoveAll(filepath.Join(dirC, ".shellenv")); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err := runCLI(t, dirB, "list", "--all")
+	if err != nil {
+		t.Fatalf("list --all: %v", err)
+	}
+	if !strings.Contains(stdout, realpath(t, dirA)) || !strings.Contains(stdout, realpath(t, dirB)) {
+		t.Fatalf("expected both live roots in output, got: %s", stdout)
+	}
+	if strings.Contains(stdout, realpath(t, dirC)) {
+		t.Fatalf("stale root must be omitted, got: %s", stdout)
+	}
+	if !strings.Contains(stdout, "bash@5.2") {
+		t.Fatalf("expected declared shell in output, got: %s", stdout)
+	}
+
+	// Plain list is untouched: names only, current directory only.
+	stdout, _, err = runCLI(t, dirB, "list")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "default" {
+		t.Fatalf("plain list changed behavior: %q", stdout)
+	}
+}
+
+func TestCreateSucceedsWhenRegistryUnwritable(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dir := t.TempDir()
+
+	// A directory where the registry file should be makes every save fail.
+	if err := os.MkdirAll(registry.Path(home)+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(registry.Path(home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// The registry is advisory: create must still succeed, warning on stderr.
+	_, stderr, err := runCLI(t, dir, "create", "--shell", "bash@5.2")
+	if err != nil {
+		t.Fatalf("create must not fail on registry errors, got: %v", err)
+	}
+	if !strings.Contains(stderr, "registry") {
+		t.Fatalf("expected registry warning on stderr, got: %s", stderr)
+	}
+	if _, err := project.ReadMetadata(dir, "default"); err != nil {
+		t.Fatalf("env should exist despite registry failure: %v", err)
 	}
 }
 
@@ -389,6 +559,7 @@ func TestUseWritesCurrentEnv(t *testing.T) {
 }
 
 func TestDestroyMissingEnv(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	_, _, err := runCLI(t, dir, "destroy", "ghost")
@@ -398,6 +569,7 @@ func TestDestroyMissingEnv(t *testing.T) {
 }
 
 func TestDestroyRemovesEnv(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	envDir := project.EnvDir(dir, "old")

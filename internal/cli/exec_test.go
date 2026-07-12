@@ -528,6 +528,7 @@ func TestExecSilentWhenMetadataMissing(t *testing.T) {
 }
 
 func TestExecWithContainerCLI(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {
@@ -615,6 +616,7 @@ func TestExecWithContainerCLI(t *testing.T) {
 }
 
 func TestExecWithContainerExitCode(t *testing.T) {
+	t.Setenv("SHELLENV_HOME", t.TempDir())
 	dir := t.TempDir()
 
 	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2", "--profile", "strict"); err != nil {

@@ -8,6 +8,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 - `internal/env`: Resolves `$SHELLENV_HOME` or `~/.shellenv`; ensures subdirectories (`installs/`, `cache/`, `tmp/`); resolves declared shell runtimes under `installs/`.
 - `internal/installer`: Downloads, verifies, and builds shell runtimes from official source tarballs.
 - `internal/project`: Per-project metadata under `./.shellenv/<env>/`.
+- `internal/registry`: Advisory index of project envs (`$SHELLENV_HOME/registry.json`); best-effort, never load-bearing.
 - `internal/shell`: Activation/profile handling.
 - `profiles/`: Option presets (`strict`, `posix`, `interactive`; `.sh` plus `.fish` variants).
 - `test/`: Integration tests in `test/integration`; Go unit tests live next to code in `internal/*`.

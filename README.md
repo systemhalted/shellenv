@@ -161,12 +161,12 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 ## Command reference
 - `shellenv init`: create the global home.
 - `shellenv create [--name default] --shell <shell>@<ver> [--profile strict|posix|interactive]`: scaffold a project env.
-- `shellenv use <env>` / `shellenv list` / `shellenv destroy <env>`: set the current env, list envs, or remove one.
+- `shellenv use <env>` / `shellenv list [--all]` / `shellenv destroy <env>`: set the current env, list envs (`--all` also shows envs registered from other directories as `NAME  SHELL  ROOT`), or remove one.
 - `shellenv activate [<env>] [--shell-type bash|zsh|fish] [--strict-shell] [--isolate-home]`: print an activation snippet to `eval`; `--isolate-home` also redirects `HOME`/`TMPDIR`/`XDG_*` to the env sandbox.
 - `shellenv deactivate [--shell-type bash|zsh|fish]`: print a snippet restoring the session (PATH, prompt, isolated vars, `SHELLENV_*`).
 - `shellenv exec [<env>] [--profile] [--strict-shell] [--ephemeral] [--container <image>] -- <cmd> [args]`: run a command in the env without activating your shell (sandboxes `HOME`/`TMPDIR`/`XDG_*`, propagates the exit code). `--ephemeral` swaps the persistent sandbox home for a throwaway one deleted after the run. If `--container` is provided, executes inside the specified Docker or Podman image with mounted workspace.
 - `shellenv which <binary>`: resolve a tool, preferring the active env's `bin/`.
-- `shellenv install <shell>@<ver> [--require-checksum]` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`; `--require-checksum` refuses versions without a pinned SHA-256), remove one, or list what's installed.
+- `shellenv install <shell>@<ver> [--require-checksum]` / `shellenv uninstall …` / `shellenv versions`: build a runtime from the official source tarball (bash and zsh; needs `cc`/`make`/`tar`; `--require-checksum` refuses versions without a pinned SHA-256), remove one, or list what's installed. `uninstall` warns about envs that still declare the removed version — in the current directory and, via the advisory registry (`$SHELLENV_HOME/registry.json`, maintained by `create`/`destroy`), in other registered projects.
 - `shellenv doctor`: quick health check of the global home and the build toolchain `install` needs.
 
 ## Environment variables
