@@ -18,11 +18,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # go.mod pins the declared minimum (1.22); this job proves the module
-      # still builds and passes on it. The lint job runs on stable instead.
-      - uses: actions/setup-go@v6
+      # Linux verifies the declared minimum (go.mod's 1.22). macOS tests with
+      # stable Go — the same toolchain darwin release artifacts are built
+      # with — because Go 1.22.0 binaries lack the LC_UUID load command the
+      # dyld on current macOS runners hard-requires (test binaries abort).
+      - name: setup Go (Linux, go.mod minimum)
+        if: runner.os == 'Linux'
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+
+      - name: setup Go (macOS, stable)
+        if: runner.os == 'macOS'
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
 
       - name: gofmt
         run: |
