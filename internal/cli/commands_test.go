@@ -923,8 +923,7 @@ func TestWhichEnvBinStillBeatsRuntime(t *testing.T) {
 	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	envTool := filepath.Join(project.EnvDir(dir, "default"), "bin", "tool")
-	if err := os.WriteFile(envTool, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(project.EnvDir(dir, "default"), "bin", "tool"), []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -932,6 +931,9 @@ func TestWhichEnvBinStillBeatsRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("which: %v", err)
 	}
+	// which derives the env path from os.Getwd(), which resolves the macOS
+	// /var -> /private/var symlink under t.TempDir().
+	envTool := filepath.Join(project.EnvDir(realpath(t, dir), "default"), "bin", "tool")
 	if got := strings.TrimSpace(stdout); got != envTool {
 		t.Fatalf("env bin must keep priority over runtime bin, got %s", got)
 	}
