@@ -175,6 +175,10 @@ func TestInstallSkipsAlreadyInstalledRuntime(t *testing.T) {
 	if !strings.Contains(stdout, "already installed") {
 		t.Fatalf("expected already-installed message, got: %s", stdout)
 	}
+	// A no-op must not also claim it installed something.
+	if strings.Contains(stdout, "Installed bash@5.2 into") {
+		t.Fatalf("no-op rerun must not print the installed message, got: %s", stdout)
+	}
 }
 
 func TestInstallRequireChecksumRejectsUnpinnedVersion(t *testing.T) {
@@ -872,6 +876,64 @@ func TestWhichFindsBinaryInEnv(t *testing.T) {
 		if resolved, err := filepath.EvalSymlinks(target); err != nil || got != resolved {
 			t.Fatalf("expected %s, got %s", target, stdout)
 		}
+	}
+}
+
+func TestWhichFindsDeclaredRuntimeBinary(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dir := t.TempDir()
+
+	// A declared, installed runtime whose binary is NOT in the env bin: which
+	// must answer with the runtime path — the same binary exec would run —
+	// not the system one from PATH.
+	runtimeBin := filepath.Join(home, "installs", "bash", "5.2", "bin")
+	if err := os.MkdirAll(runtimeBin, 0o755); err != nil {
+		t.Fatalf("mkdir runtime bin: %v", err)
+	}
+	target := filepath.Join(runtimeBin, "bash")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write fake bash: %v", err)
+	}
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	stdout, stderr, err := runCLI(t, dir, "which", "bash")
+	if err != nil {
+		t.Fatalf("which returned error: %v (stderr: %s)", err, stderr)
+	}
+	if got := strings.TrimSpace(stdout); got != target {
+		t.Fatalf("expected runtime path %s, got %s", target, got)
+	}
+}
+
+func TestWhichEnvBinStillBeatsRuntime(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SHELLENV_HOME", home)
+	dir := t.TempDir()
+
+	runtimeBin := filepath.Join(home, "installs", "bash", "5.2", "bin")
+	if err := os.MkdirAll(runtimeBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeBin, "tool"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := runCLI(t, dir, "create", "--shell", "bash@5.2"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	envTool := filepath.Join(project.EnvDir(dir, "default"), "bin", "tool")
+	if err := os.WriteFile(envTool, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err := runCLI(t, dir, "which", "tool")
+	if err != nil {
+		t.Fatalf("which: %v", err)
+	}
+	if got := strings.TrimSpace(stdout); got != envTool {
+		t.Fatalf("env bin must keep priority over runtime bin, got %s", got)
 	}
 }
 

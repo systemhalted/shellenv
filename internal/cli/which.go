@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/systemhalted/shellenv/internal/env"
 	"github.com/systemhalted/shellenv/internal/project"
 )
 
@@ -29,11 +30,20 @@ var whichCmd = &cobra.Command{
 			fmt.Println(p)
 			return nil
 		}
+		// Then the declared runtime's bin — the same priority exec gives it,
+		// so which answers with the binary exec would actually run.
+		md := loadMetadata(cwd, name)
+		if runtimeBin, status, err := env.ResolveRuntime(md.Shell); err == nil && status == env.RuntimeFound {
+			if p, err := exec.LookPath(filepath.Join(runtimeBin, args[0])); err == nil {
+				fmt.Println(p)
+				return nil
+			}
+		}
 		// Fallback to PATH search (with env/bin first if user activated)
 		if p, err := exec.LookPath(args[0]); err == nil {
 			fmt.Println(p)
 			return nil
 		}
-		return fmt.Errorf("binary %q not found in env %q (looked in %s and PATH)", args[0], name, binDir)
+		return fmt.Errorf("binary %q not found in env %q (looked in %s, the declared runtime, and PATH)", args[0], name, binDir)
 	},
 }

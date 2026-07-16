@@ -153,6 +153,7 @@ func (in *Installer) Install(shell, version string) (string, error) {
 	if err := os.RemoveAll(buildRoot); err != nil {
 		return "", err
 	}
+	fmt.Fprintf(in.Out, "Installed %s@%s into %s\n", shell, version, prefix)
 	return prefix, nil
 }
 

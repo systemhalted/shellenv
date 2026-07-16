@@ -32,11 +32,9 @@ var installCmd = &cobra.Command{
 		}
 		inst := installer.New(home, os.Stdout)
 		inst.RequireChecksum = installRequireChecksum
-		prefix, err := inst.Install(name, version)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Installed %s@%s into %s\n", name, version, prefix)
-		return nil
+		// The installer reports its own outcome ("already installed" for
+		// no-ops, "Installed ... into ..." after a real build).
+		_, err = inst.Install(name, version)
+		return err
 	},
 }
