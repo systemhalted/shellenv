@@ -5,6 +5,7 @@
 # Build outputs
 /dist/
 /bin/
+/man/
 *.exe
 *.exe~
 *.dll

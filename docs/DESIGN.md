@@ -206,6 +206,20 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
   registry-sourced warnings stay warnings.
 - **Status**: Current.
 
+## 16. Man pages are generated from the command tree (`cmd/gen-man`)
+- **Decision**: `make man` runs a build-time generator (`cmd/gen-man`) that emits one roff
+  page per command via `cobra/doc.GenManTree`, escaping `<env>`-style placeholders that
+  md2man would otherwise strip as HTML tags. `man/` is gitignored and rebuilt on demand;
+  release tarballs bundle it beside the binary. The generator lives in its own `cmd/` so
+  its markdown/roff dependencies never link into the shipped `shellenv` binary — they
+  appear in go.mod only as indirect entries.
+- **Why**: Pages generated from the live Cobra tree cannot drift from `--help`;
+  hand-written roff would.
+- **Trade-off**: Two small indirect dependencies (go-md2man, blackfriday) join go.mod,
+  bending the single-direct-dependency ethos without adding anything to the shipped
+  binary. Pages read as structured reference, not hand-crafted prose.
+- **Status**: Current.
+
 ---
 
 # Roadmap (gap-closing)

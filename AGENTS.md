@@ -4,6 +4,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 
 ## Project Structure & Module Organization
 - `cmd/shellenv`: CLI entrypoint.
+- `cmd/gen-man`: build-time man-page generator (`make man`); kept separate so its doc dependencies never link into the shellenv binary.
 - `internal/cli`: Cobra commands (`init`, `create`, `activate`, `use`, etc.).
 - `internal/env`: Resolves `$SHELLENV_HOME` or `~/.shellenv`; ensures subdirectories (`installs/`, `cache/`, `tmp/`); resolves declared shell runtimes under `installs/`.
 - `internal/installer`: Downloads, verifies, and builds shell runtimes from official source tarballs.

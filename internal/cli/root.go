@@ -50,3 +50,8 @@ func ExecuteWithArgs(args []string, stdout, stderr io.Writer) error {
 	rootCmd.SetErr(stderr)
 	return rootCmd.Execute()
 }
+
+// RootCmd exposes the assembled command tree for out-of-binary tooling
+// (cmd/gen-man). Kept accessor-only so the doc generator's dependencies are
+// never linked into the shellenv binary itself.
+func RootCmd() *cobra.Command { return rootCmd }

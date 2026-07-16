@@ -7,7 +7,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.7.0
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.6.0
 
-.PHONY: build test itest lint vulncheck
+.PHONY: build test itest lint vulncheck man
 
 build:
 	mkdir -p dist
@@ -30,3 +30,8 @@ lint:
 # patch release means "update your toolchain", per the blocking-gate policy.
 vulncheck:
 	go run $(GOVULNCHECK) ./...
+
+# Generated from the live Cobra tree so pages always match --help; man/ is
+# gitignored and rebuilt on demand (release tarballs bundle it).
+man:
+	go run ./cmd/gen-man man
