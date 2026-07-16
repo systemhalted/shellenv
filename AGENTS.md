@@ -40,6 +40,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 
 
 ## Commit & Pull Request Guidelines
+- All changes land on `main` through pull requests — no direct pushes. Release notes are auto-generated from merged PR titles (a `v0.2.0` lesson: direct pushes produce empty notes), and PRs give CI a pre-merge gate. Give the PR a title that reads well in release notes.
 - Use concise, imperative commit messages (e.g., `Add profile resolver guard`, `Tighten activation prompt formatting`), matching the existing history.
 - PRs should describe behavior changes, include reproduction/verification steps (`make build`, `make test`, `bats -r test/integration`), and note any env vars or new flags.
 - Add tests with new features or bug fixes; call out gaps explicitly if something cannot be covered.
