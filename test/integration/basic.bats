@@ -107,6 +107,18 @@ setup() {
   [[ "$output" =~ ^5\.2 ]]
 }
 
+@test "install builds macOS's bash 3.2.57 with a current compiler (opt-in)" {
+  [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
+  [ -n "${SHELLENV_TEST_REAL_INSTALL:-}" ] || skip "set SHELLENV_TEST_REAL_INSTALL=1 to run the real source build (network + several minutes)"
+
+  run bash -lc ''"$BIN"' install --require-checksum bash@3.2.57'
+  [ "$status" -eq 0 ]
+
+  run "$SHELLENV_HOME/installs/bash/3.2.57/bin/bash" -c 'echo "$BASH_VERSION"'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ ^3\.2\.57 ]]
+}
+
 @test "exec with container" {
   [ -x "$BIN" ] || skip "build not found at $BIN (run: make build)"
   # Same engines findContainerEngine accepts. SHELLENV_TEST_REQUIRE_CONTAINER=1

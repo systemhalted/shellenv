@@ -149,7 +149,7 @@ shellenv exec --strict-shell -- ./run-tests.sh
 # error: declared shell "bash@5.2" is not installed (run 'shellenv install bash@5.2', or omit --strict-shell)
 ```
 
-`shellenv install` builds the runtime from the official source tarball: it downloads into `$SHELLENV_HOME/cache/`, verifies the SHA-256 for pinned versions (`bash@5.2`, `zsh@5.9` — other versions install with an unverified-download warning; pass `--require-checksum` to fail instead of warning, before anything is downloaded), and runs `configure`/`make`/`make install` (a few minutes, once per version; build output lands in a `build.log` if anything fails). This needs `cc`/`gcc`, `make`, and `tar` — run `shellenv doctor` to check. Supported today: **bash** and **zsh**.
+`shellenv install` builds the runtime from the official source tarball: it downloads into `$SHELLENV_HOME/cache/`, verifies the SHA-256 for pinned versions (`bash@5.2`, `bash@3.2.57`, `zsh@5.9` — other versions install with an unverified-download warning; pass `--require-checksum` to fail instead of warning, before anything is downloaded), and runs `configure`/`make`/`make install` (a few minutes, once per version; build output lands in a `build.log` if anything fails). This needs `cc`/`gcc`, `make`, and `tar` — run `shellenv doctor` to check. Supported today: **bash** and **zsh**. `bash@3.2.57` is the `/bin/bash` macOS still ships; it is pre-C99 code, so shellenv builds it with `-std=gnu89` and relaxed diagnostics, which current gcc and clang need.
 
 **Caveat:** resolution is host-only — `exec --container` skips it (pick an image that provides the shell) and rejects `--strict-shell`.
 
