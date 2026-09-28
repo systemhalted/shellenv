@@ -4,7 +4,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 # Pinned here (not in CI) so local runs and CI always agree. Both tools need a
 # recent Go toolchain to build; the module itself still targets go 1.22.
-STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.7.0
+STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.6.0
 
 .PHONY: build test itest lint vulncheck man

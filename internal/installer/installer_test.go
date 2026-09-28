@@ -34,6 +34,18 @@ func TestSourceFor(t *testing.T) {
 		t.Fatalf("zsh@5.9 checksum = %q", src.SHA256)
 	}
 
+	// macOS's /bin/bash, pinned so tools that target it can test against it.
+	src, err = SourceFor("bash", "3.2.57")
+	if err != nil {
+		t.Fatalf("bash@3.2.57: %v", err)
+	}
+	if src.URL != "https://ftp.gnu.org/gnu/bash/bash-3.2.57.tar.gz" {
+		t.Fatalf("bash@3.2.57 URL = %q", src.URL)
+	}
+	if src.SHA256 != "3fa9daf85ebf35068f090ce51283ddeeb3c75eb5bc70b1a4a7cb05868bfe06a4" {
+		t.Fatalf("bash@3.2.57 checksum = %q", src.SHA256)
+	}
+
 	// Unpinned version: URL is derived, checksum empty.
 	src, err = SourceFor("bash", "5.1")
 	if err != nil || src.SHA256 != "" || !strings.Contains(src.URL, "bash-5.1.tar.gz") {
@@ -102,6 +114,10 @@ func TestInstallHappyPathUnpinnedWarns(t *testing.T) {
 	}
 	if !strings.Contains((*cmds)[1][1], "--prefix="+want) {
 		t.Fatalf("configure args = %v", (*cmds)[1])
+	}
+	// A current bash builds with the compiler's defaults: no extra flags.
+	if len((*cmds)[1]) != 2 {
+		t.Fatalf("configure got extra args for bash@5.1: %v", (*cmds)[1])
 	}
 	// No pinned checksum: a warning is printed but the build proceeds.
 	if !strings.Contains(out.String(), "no pinned checksum") {
@@ -225,5 +241,44 @@ func TestInstallBuildFailurePointsAtLog(t *testing.T) {
 	_, err := in.Install("bash", "5.1")
 	if err == nil || !strings.Contains(err.Error(), "build.log") {
 		t.Fatalf("expected build failure pointing at build.log, got %v", err)
+	}
+}
+
+// bash 3.2 is pre-C99 code. Current gcc and clang default to C23, where
+// `f()` means "no arguments" and implicit declarations are errors, so both
+// the build and the build-time helpers (mkbuiltins, via CFLAGS_FOR_BUILD)
+// need gnu89 and the relaxed diagnostics.
+func TestInstallBash32PassesLegacyCompilerFlags(t *testing.T) {
+	home := t.TempDir()
+	in, cmds, _ := fakeInstaller(t, home)
+	sum := sha256.Sum256([]byte("fake-tarball"))
+	in.pinned = map[string]string{"bash@3.2.57": hex.EncodeToString(sum[:])}
+	run := in.Run
+	in.Run = func(dir string, logTo *os.File, name string, args ...string) error {
+		if name == "make" && len(args) > 0 && args[len(args)-1] == "install" {
+			return os.MkdirAll(filepath.Join(in.prefix("bash", "3.2.57"), "bin"), 0o755)
+		}
+		return run(dir, logTo, name, args...)
+	}
+
+	if _, err := in.Install("bash", "3.2.57"); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	var configure []string
+	for _, c := range *cmds {
+		if c[0] == "./configure" {
+			configure = c
+		}
+	}
+	args := strings.Join(configure, "\n")
+	for _, want := range []string{"CFLAGS=", "CFLAGS_FOR_BUILD=", "-std=gnu89", "-Wno-implicit-function-declaration"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("configure args missing %q: %v", want, configure)
+		}
+	}
+	for _, a := range configure[1:] {
+		if strings.HasPrefix(a, "CFLAGS") && !strings.Contains(a, "-std=gnu89") {
+			t.Fatalf("%s lacks -std=gnu89", a)
+		}
 	}
 }

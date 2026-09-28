@@ -28,7 +28,27 @@ type Source struct {
 // unverified.
 var pinnedChecksums = map[string]string{
 	"bash@5.2": "a139c166df7ff4471c5e0733051642ee5556c1cc8a4a78f145583c5c81ab32fb",
-	"zsh@5.9":  "9b8d1ecedd5b5e81fbf1918e876752a7dd948e05c1a0dba10ab863842d45acd5",
+	// macOS's /bin/bash. Checked against the GNU signature (Chet Ramey,
+	// 7C01 35FB 088A AF6C 66C6 50B9 BB58 69F0 64EA 74AB).
+	"bash@3.2.57": "3fa9daf85ebf35068f090ce51283ddeeb3c75eb5bc70b1a4a7cb05868bfe06a4",
+	"zsh@5.9":     "9b8d1ecedd5b5e81fbf1918e876752a7dd948e05c1a0dba10ab863842d45acd5",
+}
+
+// legacyBashCFlags lets pre-C99 bash (3.x) build with current compilers:
+// gcc 15+ and clang 16+ default to C23, where `f()` declares "no arguments"
+// and implicit declarations and int conversions are errors.
+const legacyBashCFlags = "-O2 -std=gnu89 -fcommon -Wno-implicit-function-declaration " +
+	"-Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types"
+
+// configureArgs is the extra arguments ./configure gets for shell@version.
+// autoconf takes VAR=value arguments, so no environment change is needed.
+// CFLAGS_FOR_BUILD covers bash's build-time helpers (mkbuiltins), which do
+// not use CFLAGS.
+func configureArgs(shell, version string) []string {
+	if shell == "bash" && strings.HasPrefix(version, "3.") {
+		return []string{"CFLAGS=" + legacyBashCFlags, "CFLAGS_FOR_BUILD=" + legacyBashCFlags}
+	}
+	return nil
 }
 
 // SourceFor maps a shell name and version to its official source tarball.
@@ -133,7 +153,7 @@ func (in *Installer) Install(shell, version string) (string, error) {
 	}
 
 	steps := [][]string{
-		{"./configure", "--prefix=" + prefix},
+		append([]string{"./configure", "--prefix=" + prefix}, configureArgs(shell, version)...),
 		{"make", "-j" + strconv.Itoa(runtime.NumCPU())},
 		{"make", "install"},
 	}
