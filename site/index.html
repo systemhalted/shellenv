@@ -3,477 +3,545 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>shellenv</title>
-<meta name="description" content="Per-project shell sandboxes: pin a shell version, choose an option profile, and test scripts without touching your everyday shell setup.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23163a2b'/%3E%3Ctext x='5' y='22' font-family='monospace' font-size='15' font-weight='700' fill='%238fe0b0'%3E%3E_%3C/text%3E%3C/svg%3E">
+<title>shellenv: per-project shell sandboxes</title>
+<meta name="description" content="shellenv pins the shell version and option profile a project expects. shellenv exec runs commands with HOME, TMPDIR and XDG_* writes redirected into the project; activate does the same with --isolate-home.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231c2a44'/%3E%3Cpath d='M8 10l6 6-6 6' stroke='%23f0b45a' stroke-width='3' fill='none'/%3E%3Cpath d='M16 23h8' stroke='%23eef1f4' stroke-width='3'/%3E%3C/svg%3E">
 <style>
 :root {
-  --bg: #f6f7f2;
-  --bg-alt: #eceee6;
-  --fg: #16201a;
-  --muted: #5b675f;
-  --line: #d5d9cf;
-  --accent: #1f7a4d;
-  --accent-soft: #dcefe3;
-  --term-bg: #13241c;
-  --term-fg: #d8e6dc;
-  --term-dim: #7f9a89;
-  --term-accent: #8fe0b0;
-  --btn-fg: #f6f7f2;
-  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --paper: #eef1f4;
+  --sheet: #ffffff;
+  --well: #e3e8ee;
+  --ink: #17202e;
+  --muted: #475467;
+  --rule: #c5cdd8;
+  --link: #1d4c94;
+  --signal: #8a4b00;
+  --signal-bg: #fbecd6;
+  --focus: #1d4c94;
+  --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Sitka Text", Cambria, Georgia, serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1612;
-    --bg-alt: #151e19;
-    --fg: #e4ebe6;
-    --muted: #9aa89f;
-    --line: #26332b;
-    --accent: #6fd39c;
-    --accent-soft: #1b3326;
-    --term-bg: #0a120e;
-    --btn-fg: #0f1612;
+  :root {
+    --paper: #131923;
+    --sheet: #1a2230;
+    --well: #0e131b;
+    --ink: #e3e8ef;
+    --muted: #a3aebd;
+    --rule: #2f3a4b;
+    --link: #93b8f3;
+    --signal: #f0b45a;
+    --signal-bg: #33250f;
+    --focus: #f0b45a;
   }
-}
-:root[data-theme="dark"] {
-  --bg: #0f1612;
-  --bg-alt: #151e19;
-  --fg: #e4ebe6;
-  --muted: #9aa89f;
-  --line: #26332b;
-  --accent: #6fd39c;
-  --accent-soft: #1b3326;
-  --term-bg: #0a120e;
-  --btn-fg: #0f1612;
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font: 17px/1.6 var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  font: 18px/1.6 var(--serif);
 }
-a { color: inherit; }
-code, pre, .mono { font-family: var(--mono); }
-code { font-size: .9em; white-space: nowrap; }
-p code { color: var(--accent); }
+a { color: var(--link); text-underline-offset: .15em; }
+main:focus { outline: none; }
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+code, pre, kbd { font-family: var(--mono); font-size: .84em; }
+code { white-space: nowrap; }
+pre code { font-size: 1em; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+h1, h2, h3 { font-weight: 700; line-height: 1.15; margin: 0; }
+h2 { font-size: clamp(28px, 4.5vw, 36px); margin-bottom: 12px; }
+h3 { font-size: 20px; }
+p { margin: 0 0 1em; }
 
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+.skip {
+  position: absolute; left: 16px; top: -48px;
+  background: var(--sheet); padding: 8px 12px; z-index: 1;
+}
+.skip:focus { top: 8px; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
 @media (min-width: 720px) { .wrap { padding: 0 32px; } }
+.prose { max-width: 38em; }
 
-/* Nav */
-header.nav { border-bottom: 1px solid var(--line); }
-header.nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
-.brand { font-family: var(--mono); font-weight: 700; text-decoration: none; letter-spacing: -.01em; }
-.brand span { color: var(--accent); }
-header.nav nav { display: flex; gap: 20px; font-size: 15px; }
-header.nav nav a { text-decoration: none; color: var(--muted); }
-header.nav nav a:hover { color: var(--fg); }
-
-/* Type */
-.eyebrow {
-  font: 600 12px/1.4 var(--mono);
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 0 0 16px;
+/* Header */
+.top { border-bottom: 1px solid var(--rule); }
+.top .wrap {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 4px 24px; padding-top: 14px; padding-bottom: 14px;
 }
-h1, h2, h3 { letter-spacing: -.025em; line-height: 1.08; margin: 0; }
-h1 { font-size: clamp(42px, 8vw, 76px); font-weight: 650; }
-h1 em, h2 em { font-style: normal; color: var(--accent); }
-h2 { font-size: clamp(32px, 5vw, 48px); font-weight: 600; }
-h3 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
-.lede { font-size: 19px; color: var(--muted); max-width: 34em; margin: 20px 0 0; }
-
-section { padding: 72px 0; border-bottom: 1px solid var(--line); }
-@media (min-width: 900px) { section { padding: 104px 0; } }
-
-/* Buttons */
-.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-.btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: 550;
-  text-decoration: none; border: 1px solid var(--fg);
-}
-.btn.primary { background: var(--fg); color: var(--btn-fg); }
-.btn.secondary { background: transparent; }
-.btn:hover { opacity: .85; }
-.meta { margin-top: 24px; font: 13px/1.5 var(--mono); color: var(--muted); }
+.brand { font: 700 19px/1 var(--mono); color: var(--ink); text-decoration: none; }
+.top ul { display: flex; flex-wrap: wrap; gap: 4px 20px; list-style: none; margin: 0; padding: 0; font-size: 16px; }
 
 /* Hero */
-.hero { padding-top: 56px; }
-.hero-grid { display: grid; gap: 48px; }
+.hero { padding: 48px 0 56px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
 @media (min-width: 960px) {
-  .hero-grid { grid-template-columns: 1fr 1.05fr; align-items: center; gap: 56px; }
+  .hero { padding: 72px 0 80px; }
+  .hero-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: start; }
 }
+h1 { font-size: clamp(38px, 7vw, 60px); letter-spacing: -.02em; max-width: 11em; }
+.lede { font-size: 20px; color: var(--muted); margin-top: 20px; }
+.lede strong { color: var(--ink); font-weight: 600; }
+.buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.button {
+  display: inline-block; padding: 10px 20px; border: 2px solid var(--ink);
+  border-radius: 3px; font-size: 17px; font-weight: 600; text-decoration: none; color: var(--ink);
+}
+.button.solid { background: var(--ink); color: var(--paper); }
 
-/* Terminal */
-.term {
-  background: var(--term-bg);
-  color: var(--term-fg);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 20px 50px -24px rgba(10, 30, 20, .45);
+/* Transcripts: each line carries its stream in a text gutter, so the page never relies on colour alone */
+figure { margin: 0; }
+.tx {
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--ink);
+  border-radius: 3px;
 }
-.term-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.08);
-  font: 12px/1 var(--mono); color: var(--term-dim);
+.tx-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--rule);
+  font: 14px/1.4 var(--mono); color: var(--muted);
 }
-.dots { display: flex; gap: 6px; }
-.dots i { width: 10px; height: 10px; border-radius: 50%; background: #3a5245; display: block; }
-.term pre {
-  margin: 0; padding: 20px; overflow-x: auto;
-  font-size: 14px; line-height: 1.7; white-space: pre;
+.tx pre {
+  margin: 0; padding: 12px 14px 14px; overflow-x: auto;
+  line-height: 1.55; font-size: 14px;
 }
-.term .c { color: var(--term-dim); }
-.term .p { color: var(--term-accent); user-select: none; }
-.term .o { color: #b9cdbf; }
-.term-foot {
-  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px;
-  padding: 12px 20px; border-top: 1px solid rgba(255,255,255,.08);
-  font: 12px/1.5 var(--mono); color: var(--term-dim);
+.tx pre:focus-visible { outline-offset: -3px; }
+.tx pre code { display: inline-block; min-width: 100%; }
+.ln { display: block; white-space: pre; }
+.ln::before {
+  display: inline-block; width: 4.5ch; margin-right: 1ch;
+  color: var(--muted); content: attr(data-s);
 }
-.term-foot b { color: var(--term-accent); font-weight: 500; }
+.ln[data-s="$"] { font-weight: 600; }
+.ln[data-s="$"]::before { color: var(--ink); }
+.ln[data-s="err"] { color: var(--signal); background: var(--signal-bg); }
+.ln[data-s="err"]::before { color: var(--signal); font-weight: 600; }
+.tx figcaption { padding: 8px 14px 10px; border-top: 1px solid var(--rule); font-size: 15px; color: var(--muted); }
+.mark { color: var(--signal); }
+.tx-foot {
+  display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 14px;
+  border-top: 1px solid var(--rule); font: 13px/1.5 var(--mono);
+}
+.tx-foot span { color: var(--muted); white-space: nowrap; }
+.tx-foot b { color: var(--ink); margin-left: .5ch; }
+.strip {
+  display: flex; flex-wrap: wrap; gap: 8px 28px; list-style: none;
+  margin: 32px 0 0; padding: 14px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+  font-size: 16px;
+}
+.legend { font-size: 15px; color: var(--muted); margin-top: 10px; }
+.legend code { color: var(--ink); }
+
 .copy {
-  font: 12px/1 var(--mono); color: var(--term-fg);
-  background: transparent; border: 1px solid rgba(255,255,255,.2);
-  border-radius: 6px; padding: 7px 10px; cursor: pointer;
+  font: 13px/1 var(--mono); color: var(--ink); background: var(--sheet);
+  border: 1px solid var(--muted); border-radius: 3px; padding: 6px 10px; cursor: pointer;
 }
-.copy:hover { border-color: var(--term-accent); color: var(--term-accent); }
+.copy:hover { border-color: var(--ink); }
 
-/* Feature strip */
-.strip { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 40px; font: 13px/1.5 var(--mono); color: var(--muted); }
-.strip span::before { content: "▸ "; color: var(--accent); }
+/* Sections */
+main > section { padding: 56px 0; border-top: 1px solid var(--rule); }
+@media (min-width: 960px) { main > section { padding: 80px 0; } }
+.intro { color: var(--muted); }
 
-/* Idea cards */
-.split { display: grid; gap: 32px; margin-bottom: 48px; }
-@media (min-width: 900px) { .split { grid-template-columns: 1fr 1fr; align-items: end; } }
-.split .lede { margin: 0; }
-.cards { display: grid; gap: 16px; }
-@media (min-width: 900px) { .cards { grid-template-columns: repeat(3, 1fr); } }
-.card {
-  background: var(--bg-alt); border: 1px solid var(--line); border-radius: 12px;
-  padding: 28px 24px; display: flex; flex-direction: column; gap: 12px;
+/* What gets pinned */
+.pins { display: grid; gap: 0; margin: 28px 0 0; border-top: 2px solid var(--ink); }
+.pins > div { padding: 18px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+@media (min-width: 760px) { .pins > div { grid-template-columns: 13em minmax(0, 1fr); gap: 24px; } }
+.pins dt { font-weight: 700; }
+.pins dd { margin: 0; }
+.pins dd p:last-child { margin-bottom: 0; }
+
+/* Modes table */
+.table-scroll { overflow-x: auto; margin: 28px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; }
+table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 16px; line-height: 1.45; }
+caption { text-align: left; padding: 12px 14px; font-size: 15px; color: var(--muted); }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+thead th { border-bottom: 2px solid var(--ink); font-weight: 400; }
+thead th code { font-weight: 600; color: var(--ink); }
+tbody th { font-weight: 600; width: 26%; }
+tbody tr:last-child > * { border-bottom: 0; }
+pre code { font-size: 1em; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
 }
-.card .n { font: 13px/1 var(--mono); color: var(--accent); }
-.card p { margin: 0; color: var(--muted); font-size: 16px; }
-.card .ex {
-  margin-top: auto; padding-top: 12px; font: 13px/1.6 var(--mono); color: var(--accent);
-  overflow-x: auto; white-space: nowrap;
+
+.modes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 32px; }
+@media (min-width: 960px) { .modes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.modes h3 { margin-bottom: 6px; }
+.modes p { font-size: 17px; }
+
+.scope {
+  margin-top: 32px; padding: 16px 18px; border: 2px solid var(--signal);
+  border-radius: 3px; background: var(--sheet);
 }
+.scope p { margin: 0; }
 
-/* Workflow tabs */
-.tabs { display: flex; border: 1px solid var(--line); border-radius: 10px; padding: 4px; gap: 4px; max-width: 520px; }
-.tabs button {
-  flex: 1; font: 13px/1.3 var(--mono); padding: 10px 8px; border: 0; border-radius: 7px;
-  background: transparent; color: var(--muted); cursor: pointer;
+/* Walkthrough */
+.steps { list-style: none; counter-reset: step; margin: 32px 0 0; padding: 0; display: grid; gap: 40px; }
+.steps > li { counter-increment: step; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+@media (min-width: 960px) {
+  .steps > li { grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 40px; }
 }
-.tabs button[aria-selected="true"] { background: var(--fg); color: var(--btn-fg); }
-.panel { display: grid; gap: 32px; margin-top: 36px; }
-.panel[hidden] { display: none; }
-@media (min-width: 900px) { .panel { grid-template-columns: 1fr 1fr; gap: 48px; } }
-.panel h3 { font-size: 30px; margin-bottom: 12px; }
-.panel p { color: var(--muted); margin: 0 0 16px; }
-.term .note { padding: 0 20px 18px; margin-top: -6px; font: 13px/1.5 var(--mono); color: var(--term-dim); }
+.steps h3::before { content: counter(step) ". "; color: var(--muted); }
+.steps p { font-size: 17px; }
 
-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-caption { text-align: left; font: 600 12px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-bottom: 12px; }
-th, td { text-align: left; padding: 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-th[scope="col"] { font: 12px/1.4 var(--mono); color: var(--muted); font-weight: 500; }
-td:last-child, th[scope="col"]:last-child { text-align: right; padding-left: 16px; white-space: nowrap; }
-td.yes { color: var(--accent); font-weight: 600; }
+/* Install */
+.install { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; margin-top: 28px; }
+@media (min-width: 960px) { .install { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.install h3 { margin-bottom: 10px; }
+.install .tx { margin: 14px 0; }
+.install ul { padding-left: 1.2em; margin: 0; }
+.install li { margin-bottom: 6px; }
 
-.callout {
-  margin-top: 28px; padding: 16px 18px; border-left: 3px solid var(--accent);
-  background: var(--accent-soft); border-radius: 0 8px 8px 0; font-size: 15px; color: var(--fg);
-}
-.callout p { margin: 0; color: var(--fg); }
-
-/* Start */
-.start-grid { display: grid; gap: 40px; }
-@media (min-width: 960px) { .start-grid { grid-template-columns: 1fr 1.2fr; gap: 56px; } }
-.aside { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 15px; color: var(--muted); }
-.aside strong { color: var(--fg); display: block; margin-bottom: 4px; }
-.term .fine { padding: 14px 20px 18px; border-top: 1px solid rgba(255,255,255,.08); font-size: 13px; color: var(--term-dim); line-height: 1.6; }
-.term .fine code { color: var(--term-fg); }
-.inline-link { color: var(--accent); font-weight: 550; text-underline-offset: 3px; }
-
-/* Explore */
-.links { display: grid; gap: 0; margin-top: 40px; border-top: 1px solid var(--line); }
-@media (min-width: 900px) { .links { grid-template-columns: repeat(3, 1fr); gap: 24px; border-top: 0; } }
-.links a {
-  display: block; text-decoration: none; padding: 20px 0; border-bottom: 1px solid var(--line);
-}
-@media (min-width: 900px) { .links a { border-top: 1px solid var(--line); border-bottom: 0; } }
-.links a strong { display: block; font-size: 19px; font-weight: 600; }
-.links a strong::after { content: " →"; color: var(--accent); }
-.links a span { color: var(--muted); font-size: 15px; }
-.links a:hover strong { color: var(--accent); }
-
-footer { padding: 32px 0 48px; font-size: 14px; color: var(--muted); }
-footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
-footer a { color: var(--fg); }
-
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Footer */
+footer { border-top: 2px solid var(--ink); padding: 32px 0 48px; font-size: 16px; }
+footer h2 { font-size: 20px; margin-bottom: 12px; }
+footer ul { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+footer .doclinks { display: grid; gap: 10px; margin: 0; }
+footer .doclinks span { display: block; color: var(--muted); font-size: 15px; }
+@media (min-width: 760px) { footer .doclinks { grid-template-columns: repeat(auto-fill, minmax(15em, 1fr)); gap: 16px 32px; } }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<header class="nav">
+<header class="top">
   <div class="wrap">
-    <a class="brand" href="#top"><span>&gt;_</span> shellenv</a>
-    <nav>
-      <a href="#start">Quick start</a>
-      <a href="https://github.com/systemhalted/shellenv">GitHub</a>
+    <a class="brand" href="#main"><span class="mark" aria-hidden="true">&gt;_</span> shellenv</a>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#modes">Modes</a></li>
+        <li><a href="#docs">Docs</a></li>
+        <li><a href="https://github.com/systemhalted/shellenv">GitHub</a></li>
+      </ul>
     </nav>
   </div>
 </header>
 
-<main id="top">
+<main id="main" tabindex="-1">
 
-<section class="hero">
+<div class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="eyebrow">Your shell, with room to experiment</p>
-      <h1>A clean room for your <em>shell scripts.</em></h1>
-      <p class="lede">Treat shells like runtimes. Pin a version, choose a profile, and test inside a project environment that keeps your everyday setup out of the way.</p>
-      <div class="actions">
-        <a class="btn primary" href="#start">Get started</a>
-        <a class="btn secondary" href="https://github.com/systemhalted/shellenv">Explore the source</a>
+      <h1>Per-project shell sandboxes.</h1>
+      <p class="lede">shellenv pins the <strong>shell version</strong> and <strong>option profile</strong> a project expects. <code>shellenv exec</code> runs a command with <code>HOME</code>, <code>TMPDIR</code> and <code>XDG_*</code> writes redirected into the project, so your shell session and real home stay as they were.</p>
+      <div class="buttons">
+        <a class="button solid" href="#install">Install</a>
+        <a class="button" href="https://github.com/systemhalted/shellenv">GitHub</a>
       </div>
-      <p class="meta">Written in Go · MIT licensed · Built for the terminal</p>
     </div>
 
-    <div class="term" aria-label="Example terminal session">
-      <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>~/projects/next-experiment</span><span>bash</span></div>
-<pre><span class="c"># Set up the global home once</span>
-<span class="p">$ </span>shellenv init
-
-<span class="c"># Declare a shell environment for this project</span>
-<span class="p">$ </span>shellenv create --shell bash@5.2 --profile strict
-
-<span class="c"># Build the runtime you declared</span>
-<span class="p">$ </span>shellenv install bash@5.2
-
-<span class="c"># Run with a sandbox home</span>
-<span class="p">$ </span>shellenv exec -- printenv HOME
-<span class="o">…/.shellenv/default/home</span></pre>
-      <div class="term-foot"><span>PROJECT ENVIRONMENT</span><span><b>default</b> / bash@5.2 / strict</span></div>
-    </div>
+    <figure class="tx">
+      <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Terminal transcript"><code><span class="ln" data-s="$">shellenv init</span>
+<span class="ln" data-s="out">Initialized shellenv at …/home</span>
+<span class="ln" data-s="$">shellenv create --shell bash@5.2 --profile strict</span>
+<span class="ln" data-s="out">Created env "default" for shell bash@5.2 at …/demo/.shellenv/default</span>
+<span class="ln" data-s="$">shellenv exec -- printenv HOME TMPDIR</span>
+<span class="ln" data-s="err">warning: declared shell "bash@5.2" is not installed; falling back to the system shell (run 'shellenv install bash@5.2' or use --strict-shell to enforce)</span>
+<span class="ln" data-s="out">…/demo/.shellenv/default/home</span>
+<span class="ln" data-s="out">…/demo/.shellenv/default/home/tmp</span>
+<span class="ln" data-s="$">shellenv exec --strict-shell -- true; echo "exit $?"</span>
+<span class="ln" data-s="err">declared shell "bash@5.2" is not installed (run 'shellenv install bash@5.2', or omit --strict-shell)</span>
+<span class="ln" data-s="out">exit 1</span></code></pre>
+      <div class="tx-foot"><span>env <b>default</b></span> <span>shell <b>bash@5.2</b></span> <span>profile <b>strict</b></span></div>
+      <figcaption>Real output from shellenv v0.3.0 before <code>bash@5.2</code> is installed. Absolute paths are shortened to <code>…/</code>.</figcaption>
+    </figure>
   </div>
   <div class="wrap">
-    <div class="strip"><span>Bash &amp; Zsh runtimes</span><span>Fish activation support</span><span>Docker &amp; Podman execution</span></div>
+    <ul class="strip" aria-label="Supported">
+      <li>Builds bash and zsh runtimes</li>
+      <li>Activates bash, zsh and fish sessions</li>
+      <li>Optional Docker or Podman mode</li>
+      <li>Written in Go, MIT licensed</li>
+    </ul>
+    <p class="legend">In transcripts, <code>$</code> marks a command, <code>out</code> marks stdout and <code>err</code> marks stderr.</p>
   </div>
-</section>
+</div>
 
-<section id="idea">
+<section id="pinned" aria-labelledby="pinned-h">
   <div class="wrap">
-    <div class="split">
+    <h2 id="pinned-h">What gets pinned</h2>
+    <p class="intro prose">One script can behave differently across shells. Each project env lives in <code>./.shellenv/&lt;env&gt;/</code>. It records a shell and a profile, and it has its own <code>bin/</code> and sandbox <code>home/</code>.</p>
+    <dl class="pins">
       <div>
-        <p class="eyebrow">01 / The idea</p>
-        <h2>Your project sets the rules.</h2>
+        <dt>Shell runtime</dt>
+        <dd><p><code>shellenv install</code> builds bash or zsh from the official source tarball. <code>bash@5.2</code>, <code>bash@3.2.57</code> and <code>zsh@5.9</code> have pinned SHA-256 checksums. Other versions install with an unverified-download warning, or fail up front with <code>--require-checksum</code>.</p></dd>
       </div>
-      <p class="lede">One script can behave differently across shells. Make those differences explicit, then test them without rearranging your login shell.</p>
-    </div>
-    <div class="cards">
-      <article class="card">
-        <span class="n">[ 01 ]</span>
-        <h3>Declare the runtime</h3>
-        <p>Record the shell and version your project expects. Install Bash or Zsh from source, then use <code>--strict-shell</code> to require that runtime.</p>
-        <div class="ex">bash@5.2 · bash@3.2.57 · zsh@5.9</div>
-      </article>
-      <article class="card">
-        <span class="n">[ 02 ]</span>
-        <h3>Choose the conditions</h3>
-        <p>Try strict, POSIX, or interactive profiles. With <code>--profile</code>, the profile is sourced first and its options govern what that shell runs directly, such as a sourced script.</p>
-        <div class="ex">shellenv exec --profile -- . ./probe.sh</div>
-      </article>
-      <article class="card">
-        <span class="n">[ 03 ]</span>
-        <h3>Contain the clutter</h3>
-        <p>Host execution redirects <code>HOME</code>, <code>TMPDIR</code>, and <code>XDG_*</code> paths into your environment. Use a throwaway home when you want a fresh start on every run.</p>
-        <div class="ex">shellenv exec --ephemeral -- ./probe.sh</div>
-      </article>
-    </div>
+      <div>
+        <dt>Option profile</dt>
+        <dd><p><code>strict</code> (<code>set -euo pipefail</code>), <code>posix</code> (<code>set -o posix</code>) or <code>interactive</code>. Fish sessions source a <code>.fish</code> variant of the profile; shellenv doesn't install fish itself.</p></dd>
+      </div>
+      <div>
+        <dt><code>PATH</code></dt>
+        <dd><p>The env's <code>bin/</code> comes first, then the installed runtime's <code>bin/</code>, then your usual <code>PATH</code>. A tool dropped into <code>bin/</code> shadows the system copy.</p></dd>
+      </div>
+      <div>
+        <dt>Home and temp dirs</dt>
+        <dd><p><code>HOME</code>, <code>TMPDIR</code>, <code>XDG_CONFIG_HOME</code>, <code>XDG_CACHE_HOME</code>, <code>XDG_DATA_HOME</code> and <code>XDG_STATE_HOME</code> point into the env's sandbox <code>home/</code>. <code>exec</code> always does this; <code>activate</code> does it with <code>--isolate-home</code>.</p></dd>
+      </div>
+    </dl>
   </div>
 </section>
 
-<section id="workflow">
+<section id="modes" aria-labelledby="modes-h">
   <div class="wrap">
-    <div class="split">
-      <div>
-        <p class="eyebrow">02 / Pick your workflow</p>
-        <h2>One environment. Three ways to work.</h2>
-      </div>
-      <p class="lede">Stay interactive, run a single command, or add container namespaces. Choose the boundary your experiment needs.</p>
-    </div>
+    <h2 id="modes-h">Three ways to run</h2>
+    <p class="intro prose">All three put the env's <code>bin/</code> first on <code>PATH</code>. They differ in how far the isolation goes. Each picks the env you name, else <code>./.shellenv/current</code> (set by <code>shellenv use</code>), else <code>default</code>.</p>
 
-    <div class="tabs" role="tablist" aria-label="Workflows">
-      <button role="tab" id="t-exec" aria-controls="p-exec" aria-selected="true">01 / Execute</button>
-      <button role="tab" id="t-act" aria-controls="p-act" aria-selected="false" tabindex="-1">02 / Activate</button>
-      <button role="tab" id="t-ctr" aria-controls="p-ctr" aria-selected="false" tabindex="-1">03 / Container</button>
-    </div>
-
-    <div class="panel" role="tabpanel" id="p-exec" aria-labelledby="t-exec">
-      <div>
-        <p class="eyebrow">A focused run</p>
-        <h3>Run it. Keep the result.</h3>
-        <p>Execute a command in a subprocess with a sandbox home. Your current shell session stays as it was, and the command's exit code carries through to CI.</p>
-        <div class="term">
-          <div class="term-bar"><span>host mode</span><button class="copy" data-copy="shellenv exec -- ./run-tests.sh">Copy</button></div>
-<pre><span class="p">$ </span>shellenv exec -- ./run-tests.sh</pre>
-          <div class="note">Add --ephemeral to delete the sandbox home after the run.</div>
-        </div>
-      </div>
+    <div class="table-scroll" role="region" aria-labelledby="modes-cap" tabindex="0">
       <table>
-        <caption>Execute: boundaries at a glance</caption>
-        <thead><tr><th scope="col">Boundary</th><th scope="col">exec</th></tr></thead>
+        <caption id="modes-cap">What each mode isolates (same as the table in README.md)</caption>
+        <thead>
+          <tr>
+            <td></td>
+            <th scope="col"><code>eval "$(shellenv activate)"</code></th>
+            <th scope="col"><code>shellenv exec -- &lt;cmd&gt;</code></th>
+            <th scope="col"><code>shellenv exec --container &lt;image&gt; -- &lt;cmd&gt;</code></th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td>Project tools first on PATH</td><td class="yes">Yes</td></tr>
-          <tr><td>Sandbox HOME / TMPDIR / XDG_*</td><td class="yes">Yes</td></tr>
-          <tr><td>Filesystem, process &amp; network namespaces</td><td>No</td></tr>
-          <tr><td>Changes the current shell session</td><td>No</td></tr>
-          <tr><td>Propagates the exit code</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">Prepends env <code>bin/</code> to <code>PATH</code></th><td>yes</td><td>yes</td><td>yes (inside container)</td></tr>
+          <tr><th scope="row">Sets <code>SHELLENV_*</code> variables</th><td>yes</td><td>yes</td><td>yes (inside container)</td></tr>
+          <tr><th scope="row">Sandboxes <code>HOME</code> / <code>TMPDIR</code></th><td>opt-in (<code>--isolate-home</code>)</td><td><strong>yes</strong> (<code>./.shellenv/&lt;env&gt;/home/</code>)</td><td><strong>yes</strong> (mounted on container)</td></tr>
+          <tr><th scope="row">Network / Process isolation</th><td><strong>no</strong></td><td><strong>no</strong></td><td><strong>yes</strong> (container namespaces)</td></tr>
+          <tr><th scope="row">System filesystem isolation</th><td><strong>no</strong></td><td><strong>no</strong></td><td><strong>yes</strong> (container namespaces)</td></tr>
+          <tr><th scope="row">Changes current shell session</th><td>yes (until you reset it)</td><td>no (subprocess only)</td><td>no (container execution)</td></tr>
+          <tr><th scope="row">Propagates command exit code</th><td>n/a</td><td>yes</td><td>yes</td></tr>
         </tbody>
       </table>
     </div>
 
-    <div class="panel" role="tabpanel" id="p-act" aria-labelledby="t-act" hidden>
+    <div class="modes">
       <div>
-        <p class="eyebrow">An interactive session</p>
-        <h3>Step inside.</h3>
-        <p>Activate the environment in your current shell to get its tools, runtime, and profile at your prompt. Add <code>--isolate-home</code> to sandbox writes to <code>~</code> too, and deactivate to put everything back.</p>
-        <div class="term">
-          <div class="term-bar"><span>bash / zsh</span><button class="copy" data-copy='eval "$(shellenv activate --isolate-home)"'>Copy</button></div>
-<pre><span class="p">$ </span>eval "$(shellenv activate --isolate-home)"
-<span class="p">$ </span>eval "$(shellenv deactivate)"</pre>
-          <div class="note">Fish: shellenv activate --shell-type fish | source</div>
-        </div>
+        <h3><code>activate</code></h3>
+        <p>For an interactive session with the env's tools and profile at your prompt. Undo it with <code>eval "$(shellenv deactivate)"</code>.</p>
+        <figure class="tx">
+<pre tabindex="0" aria-label="activate example"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span></code></pre>
+        </figure>
+        <p class="legend">Fish pipes the snippet instead of using <code>eval</code>:</p>
+        <figure class="tx">
+<pre tabindex="0" aria-label="activate example for fish"><code><span class="ln" data-s="$">shellenv activate --shell-type fish | source</span></code></pre>
+        </figure>
       </div>
-      <table>
-        <caption>Activate: boundaries at a glance</caption>
-        <thead><tr><th scope="col">Boundary</th><th scope="col">activate</th></tr></thead>
-        <tbody>
-          <tr><td>Project tools first on PATH</td><td class="yes">Yes</td></tr>
-          <tr><td>Sandbox HOME / TMPDIR / XDG_*</td><td>Opt in</td></tr>
-          <tr><td>Filesystem, process &amp; network namespaces</td><td>No</td></tr>
-          <tr><td>Changes the current shell session</td><td class="yes">Yes</td></tr>
-          <tr><td>Propagates the exit code</td><td>n/a</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="panel" role="tabpanel" id="p-ctr" aria-labelledby="t-ctr" hidden>
       <div>
-        <p class="eyebrow">Real isolation</p>
-        <h3>Put a wall around it.</h3>
-        <p>Run the command inside a Docker or Podman container with the sandbox home mounted. Use it for scripts that install packages or otherwise change the system. The image supplies the shell.</p>
-        <div class="term">
-          <div class="term-bar"><span>container mode</span><button class="copy" data-copy="shellenv exec --container ubuntu:22.04 -- ./install.sh">Copy</button></div>
-<pre><span class="p">$ </span>shellenv exec --container ubuntu:22.04 -- ./install.sh</pre>
-          <div class="note">--strict-shell is host-only; pick an image that provides your shell.</div>
-        </div>
+        <h3><code>exec</code></h3>
+        <p>For one-off or scripted runs. Writes to <code>$HOME</code> and temp files land in the sandbox, and the command's exit status is passed through. Add <code>--ephemeral</code> for a sandbox home that is deleted after the run.</p>
+        <figure class="tx">
+<pre tabindex="0" aria-label="exec example"><code><span class="ln" data-s="$">shellenv exec -- ./steps.sh</span></code></pre>
+        </figure>
       </div>
-      <table>
-        <caption>Container: boundaries at a glance</caption>
-        <thead><tr><th scope="col">Boundary</th><th scope="col">exec --container</th></tr></thead>
-        <tbody>
-          <tr><td>Project tools first on PATH</td><td class="yes">Yes</td></tr>
-          <tr><td>Sandbox HOME / TMPDIR / XDG_*</td><td class="yes">Yes</td></tr>
-          <tr><td>Filesystem, process &amp; network namespaces</td><td class="yes">Yes</td></tr>
-          <tr><td>Changes the current shell session</td><td>No</td></tr>
-          <tr><td>Propagates the exit code</td><td class="yes">Yes</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout"><p><strong>Know the boundary.</strong> Host mode is a user-space sandbox, not a security sandbox for untrusted code. Network, processes, and the wider filesystem remain shared. Container mode adds namespace isolation.</p></div>
-  </div>
-</section>
-
-<section id="start">
-  <div class="wrap start-grid">
-    <div>
-      <p class="eyebrow">03 / Start small</p>
-      <h2>Your first sandbox is a few commands away.</h2>
-      <p class="lede">Build from source with Go 1.22+ and <code>make</code>, or download a platform tarball from GitHub Releases.</p>
-      <p style="margin-top:20px"><a class="inline-link" href="https://github.com/systemhalted/shellenv/releases">Browse releases →</a></p>
-      <div class="aside">
-        <strong>Using a release?</strong>
-        Verify the archive against <code>SHA256SUMS</code>. Keep the binary beside its bundled <code>profiles/</code> directory, or set <code>SHELLENV_PROFILES</code>.
+      <div>
+        <h3><code>exec --container</code></h3>
+        <p>For scripts that change the system. Runs in Docker or Podman, whichever is on <code>PATH</code>, with the project directory mounted at the same path. The image supplies the shell, so <code>--strict-shell</code> is rejected here.</p>
+        <figure class="tx">
+<pre tabindex="0" aria-label="container example"><code><span class="ln" data-s="$">shellenv exec --container debian:stable-slim -- ./steps.sh</span></code></pre>
+        </figure>
       </div>
     </div>
-    <div class="term">
-      <div class="term-bar"><span>FROM SOURCE</span><button class="copy" data-copy-from="src-cmds">Copy commands</button></div>
-<pre id="src-cmds">git clone https://github.com/systemhalted/shellenv.git
-cd shellenv
-make build
 
-./dist/shellenv init
-./dist/shellenv create --shell bash@5.2 --profile strict
-./dist/shellenv install bash@5.2
-./dist/shellenv exec --strict-shell -- printenv HOME</pre>
-      <div class="fine">Installing a runtime needs a C compiler, <code>make</code>, and <code>tar</code>, and takes a few minutes once per version. Without an installed runtime, host mode falls back to the system shell with a warning unless you pass <code>--strict-shell</code>.</div>
+    <div class="scope">
+      <p><strong>Scope.</strong> Host mode (<code>activate</code> and <code>exec</code>) is a user-space sandbox. <code>exec</code> always keeps writes out of your real home; <code>activate</code> does so only with <code>--isolate-home</code>. Host mode is <strong>not</strong> a security sandbox for untrusted code: the network, processes and the rest of the filesystem are shared. Only <code>exec --container</code> adds namespace isolation. <a href="https://github.com/systemhalted/shellenv/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> lists exactly what is and isn't isolated.</p>
     </div>
   </div>
 </section>
 
-<section id="explore" style="border-bottom:0">
+<section id="walkthrough" aria-labelledby="walk-h">
   <div class="wrap">
-    <p class="eyebrow">Keep exploring</p>
-    <h2>Small tool. Clear boundaries.</h2>
-    <div class="links">
-      <a href="https://github.com/systemhalted/shellenv#readme"><strong>Usage &amp; command reference</strong><span>Examples, profiles, and everyday workflows</span></a>
-      <a href="https://github.com/systemhalted/shellenv/blob/main/docs/ARCHITECTURE.md"><strong>Architecture</strong><span>What is isolated, and how execution works</span></a>
-      <a href="https://github.com/systemhalted/shellenv/blob/main/CONTRIBUTING.md"><strong>Contribute</strong><span>Help improve shellenv</span></a>
+    <h2 id="walk-h">Walkthrough</h2>
+    <p class="intro prose">From an empty project directory, with <code>SHELLENV_HOME</code> pointed at a temp directory so nothing touches <code>~/.shellenv</code>. Output is from a real run, with paths shortened to <code>…/</code>.</p>
+
+    <ol class="steps" role="list">
+      <li>
+        <div>
+          <h3>Create the global home</h3>
+          <p><code>init</code> sets up <code>$SHELLENV_HOME</code> (default <code>~/.shellenv</code>) with <code>installs/</code>, <code>cache/</code> and <code>tmp/</code>.</p>
+        </div>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Step 1 transcript"><code><span class="ln" data-s="$">export SHELLENV_HOME="$(mktemp -d)/home"</span>
+<span class="ln" data-s="$">shellenv init</span>
+<span class="ln" data-s="out">Initialized shellenv at …/home</span></code></pre>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Declare the shell and profile</h3>
+          <p><code>create</code> writes <code>./.shellenv/default/</code> with <code>metadata.json</code>, <code>bin/</code> and <code>home/</code>.</p>
+        </div>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Step 2 transcript"><code><span class="ln" data-s="$">shellenv create --shell bash@5.2 --profile strict</span>
+<span class="ln" data-s="out">Created env "default" for shell bash@5.2 at …/demo/.shellenv/default</span></code></pre>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Build the runtime</h3>
+          <p><code>install</code> downloads the source tarball, checks its SHA-256 and builds it, once per version. You can skip it: commands then run on the system shell with a warning.</p>
+        </div>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Step 3 transcript"><code><span class="ln" data-s="$">shellenv install bash@5.2</span>
+<span class="ln" data-s="out">Downloading https://ftp.gnu.org/gnu/bash/bash-5.2.tar.gz...</span>
+<span class="ln" data-s="out">Extracting bash-5.2.tar.gz...</span>
+<span class="ln" data-s="out">Running ./configure --prefix=…/home/installs/bash/5.2 CFLAGS=-O2 -std=gnu11 CFLAGS_FOR_BUILD=-O2 -std=gnu11...</span>
+<span class="ln" data-s="out">Running make -j4...</span>
+<span class="ln" data-s="out">Running make install...</span>
+<span class="ln" data-s="out">Installed bash@5.2 into …/home/installs/bash/5.2</span></code></pre>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Run commands with <code>exec</code></h3>
+          <p>With the runtime installed, the warning is gone. <code>HOME</code> and <code>TMPDIR</code> point into the sandbox.</p>
+          <p><code>--profile</code> sources the strict profile first. Its <code>set -e</code> applies to what that shell runs directly, so source the script with <code>.</code> to test it under the profile. A script run through its own shebang starts a fresh shell and gets only the profile's exported variables.</p>
+        </div>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Step 4 transcript"><code><span class="ln" data-s="$">shellenv exec -- printenv HOME TMPDIR</span>
+<span class="ln" data-s="out">…/demo/.shellenv/default/home</span>
+<span class="ln" data-s="out">…/demo/.shellenv/default/home/tmp</span>
+<span class="ln" data-s="$">printf '#!/bin/sh\necho "step 1"\nfalse\necho "step 2"\n' &gt; steps.sh</span>
+<span class="ln" data-s="$">chmod +x steps.sh</span>
+<span class="ln" data-s="$">shellenv exec -- ./steps.sh; echo "exit $?"</span>
+<span class="ln" data-s="out">step 1</span>
+<span class="ln" data-s="out">step 2</span>
+<span class="ln" data-s="out">exit 0</span>
+<span class="ln" data-s="$">shellenv exec --profile -- . ./steps.sh; echo "exit $?"</span>
+<span class="ln" data-s="out">step 1</span>
+<span class="ln" data-s="out">exit 1</span></code></pre>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Activate, then deactivate</h3>
+          <p><code>activate</code> prints a snippet for your shell to <code>eval</code>. <code>deactivate</code> restores <code>PATH</code>, the prompt and any isolated variables, and unsets <code>SHELLENV_*</code>.</p>
+          <p>It can't undo shell options. After the strict profile, <code>set -euo pipefail</code> stays on in that shell, so a failing command will close it. Use a throwaway shell for this.</p>
+        </div>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Step 5 transcript"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span>
+<span class="ln" data-s="$">echo "$SHELLENV_ENV_NAME"</span>
+<span class="ln" data-s="out">default</span>
+<span class="ln" data-s="$">command -v bash</span>
+<span class="ln" data-s="out">…/home/installs/bash/5.2/bin/bash</span>
+<span class="ln" data-s="$">eval "$(shellenv deactivate)"</span>
+<span class="ln" data-s="$">command -v bash</span>
+<span class="ln" data-s="out">/usr/bin/bash</span></code></pre>
+        </figure>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="install" aria-labelledby="install-h">
+  <div class="wrap">
+    <h2 id="install-h">Install</h2>
+    <p class="intro prose">shellenv is a single Go binary for Linux and macOS.</p>
+    <div class="install">
+      <div>
+        <h3>From a release</h3>
+        <p>Download the tarball for your platform from the <a href="https://github.com/systemhalted/shellenv/releases">releases page</a> and check it against <code>SHA256SUMS</code>. Replace <code>&lt;version&gt;</code> below with the release you downloaded.</p>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Release install commands"><code><span class="ln" data-s="$">tar -xzf shellenv-&lt;version&gt;-linux-amd64.tar.gz</span>
+<span class="ln" data-s="$">export PATH="$PWD/shellenv-&lt;version&gt;-linux-amd64:$PATH"</span>
+<span class="ln" data-s="$">shellenv --version</span></code></pre>
+        </figure>
+        <ul>
+          <li>Keep the binary next to its bundled <code>profiles/</code> directory. If you move or symlink the binary alone, set <code>SHELLENV_PROFILES</code> to that <code>profiles/</code> directory.</li>
+          <li>Man pages are in <code>man/</code>. Read a man page in place with <code>man -l man/shellenv.1</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>From source</h3>
+        <p>Needs Go 1.22 or later and <code>make</code>.</p>
+        <figure class="tx">
+          <div class="tx-head"><span>bash</span></div>
+<pre tabindex="0" aria-label="Source build commands"><code><span class="ln" data-s="$">git clone https://github.com/systemhalted/shellenv.git</span>
+<span class="ln" data-s="$">cd shellenv</span>
+<span class="ln" data-s="$">make build</span>
+<span class="ln" data-s="$">./dist/shellenv --version</span></code></pre>
+        </figure>
+        <ul>
+          <li>The binary lands in <code>./dist/shellenv</code>. Run it from the checkout and it finds the built-in profiles in <code>./profiles</code>.</li>
+          <li><code>shellenv install</code> needs a C compiler, <code>make</code> and <code>tar</code>, and takes a few minutes once per version. <code>shellenv doctor</code> checks for them.</li>
+        </ul>
+      </div>
     </div>
   </div>
 </section>
 
+
+<p class="visually-hidden" role="status" id="copy-status"></p>
 </main>
 
-<footer>
+<footer id="docs">
   <div class="wrap">
-    <span><span class="mono" style="color:var(--accent)">&gt;_</span> shellenv · A project by <a href="https://github.com/systemhalted">systemhalted</a></span>
-    <a href="https://github.com/systemhalted/shellenv/blob/main/LICENSE">MIT license</a>
+    <h2>Docs</h2>
+    <ul class="doclinks">
+      <li><a href="https://github.com/systemhalted/shellenv#readme">README</a> <span>Usage, profiles and the full command reference</span></li>
+      <li><a href="https://github.com/systemhalted/shellenv/blob/main/docs/ARCHITECTURE.md">Architecture</a> <span>What is isolated and how execution works</span></li>
+      <li><a href="https://github.com/systemhalted/shellenv/blob/main/CONTRIBUTING.md">Contributing</a> <span>Workflow and standards for changes</span></li>
+      <li><a href="https://github.com/systemhalted/shellenv/releases">Releases</a> <span>Tarballs for Linux and macOS, with SHA256SUMS</span></li>
+      <li><a href="https://github.com/systemhalted/shellenv/blob/main/LICENSE">MIT license</a> <span>Provided as-is, with no warranty</span></li>
+    </ul>
   </div>
 </footer>
 
 <script>
+// Copy buttons are added only when the clipboard API exists, so the page reads
+// the same without JS. Each copies the command lines of its block: no prompt
+// markers, no output.
 (function () {
-  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
-  function select(tab) {
-    tabs.forEach(function (t) {
-      var on = t === tab;
-      t.setAttribute('aria-selected', on);
-      t.tabIndex = on ? 0 : -1;
-      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+  if (!navigator.clipboard) return;
+  var status = document.getElementById('copy-status');
+  document.querySelectorAll('.tx').forEach(function (tx) {
+    var lines = tx.querySelectorAll('.ln[data-s="$"]');
+    if (!lines.length) return;
+    var cmds = Array.prototype.map.call(lines, function (l) { return l.textContent; }).join('\n');
+    var head = tx.querySelector('.tx-head');
+    if (!head) {
+      head = document.createElement('div');
+      head.className = 'tx-head';
+      head.appendChild(document.createElement('span'));
+      tx.insertBefore(head, tx.firstChild);
+    }
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', function () {
+      function done(msg) {
+        btn.textContent = msg;
+        status.textContent = msg;
+        setTimeout(function () { btn.textContent = 'Copy'; status.textContent = ''; }, 1500);
+      }
+      try {
+        navigator.clipboard.writeText(cmds + '\n').then(function () { done('Copied'); }, failed);
+      } catch (e) {
+        failed();
+      }
+      function failed() {
+        done('Copy failed');
+        status.textContent = 'Copy failed. Select the commands to copy them manually.';
+      }
     });
-  }
-  tabs.forEach(function (t, i) {
-    t.addEventListener('click', function () { select(t); });
-    t.addEventListener('keydown', function (e) {
-      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-      if (!d) return;
-      var next = tabs[(i + d + tabs.length) % tabs.length];
-      select(next); next.focus();
-    });
-  });
-
-  document.querySelectorAll('.copy').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var src = b.getAttribute('data-copy-from');
-      var text = src ? document.getElementById(src).textContent : b.getAttribute('data-copy');
-      var label = b.textContent;
-      function done(msg) { b.textContent = msg; setTimeout(function () { b.textContent = label; }, 1500); }
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(function () { done('Copied'); }, function () { done('Copy failed'); });
-      } else { done('Copy failed'); }
-    });
+    head.appendChild(btn);
   });
 })();
 </script>
