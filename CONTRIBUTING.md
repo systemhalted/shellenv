@@ -15,7 +15,7 @@ Keep changes small, tested, and contained to avoid touching your real shell setu
 
 ## Coding style
 - Run `gofmt` on Go code; Go version 1.22.
-- Cobra commands live in `internal/cli/<command>.go`; flag names are kebab-case (`--shell`, `--profile`).
+- [Cobra](https://github.com/spf13/cobra) commands live in `internal/cli/<command>.go` (see the [Cobra docs](https://cobra.dev/)); flag names are kebab-case (`--shell`, `--profile`).
 - Prefer explicit errors and concise help text; default to `internal` visibility unless needed externally.
 - Keep public surface minimal and avoid touching user shells outside the project or `SHELLENV_HOME`.
 

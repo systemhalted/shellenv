@@ -182,6 +182,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 ## Docs
 - Contributor workflow and standards: `CONTRIBUTING.md`.
 - Architecture, isolation model, and flows: `docs/ARCHITECTURE.md`.
+- Open source projects shellenv uses, with licenses: [`docs/ARCHITECTURE.md#open-source-projects`](docs/ARCHITECTURE.md#open-source-projects).
 - Design decisions, rationale, and roadmap: `docs/DESIGN.md`.
 - Task notes and change log: `docs/Task.md`.
 - Project website: `site/` (static HTML, published to GitHub Pages by `.github/workflows/pages.yml` on pushes to `main` that touch it).
