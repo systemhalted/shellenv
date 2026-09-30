@@ -142,25 +142,13 @@ flowchart TD
 
 ## Open source projects
 
-shellenv is built on, builds, and is tested with the projects below. Go module versions are pinned in `go.mod`, and Staticcheck and govulncheck versions in the `Makefile`.
+shellenv is built on, builds, and is tested with the projects below. Only direct dependencies are listed; their own dependencies are in `go.mod` and `go.sum`. Go module versions are pinned in `go.mod`, and Staticcheck and govulncheck versions in the `Makefile`.
 
-### Linked into the `shellenv` binary
-
-| Project | Used for | License |
-| --- | --- | --- |
-| [Cobra](https://github.com/spf13/cobra) | Commands, flags, help text, dispatch | Apache-2.0 |
-| [pflag](https://github.com/spf13/pflag) | POSIX/GNU-style flag parsing (via Cobra) | BSD-3-Clause |
-
-Cobra also pulls in [mousetrap](https://github.com/inconshreveable/mousetrap) (Apache-2.0), which is compiled only on Windows, so it is not in the Linux or macOS builds.
-
-### Build-time only (`cmd/gen-man`, `make man`)
+### Go module
 
 | Project | Used for | License |
 | --- | --- | --- |
-| [cobra/doc](https://github.com/spf13/cobra/tree/main/doc) | Generating man pages from the command tree | Apache-2.0 |
-| [go-md2man](https://github.com/cpuguy83/go-md2man) | Markdown to roff conversion | MIT |
-| [Blackfriday](https://github.com/russross/blackfriday) | Markdown parsing for go-md2man | BSD-2-Clause |
-| [go-yaml](https://github.com/go-yaml/yaml) (`gopkg.in/yaml.v3`) | Imported by cobra/doc; unused by shellenv | MIT and Apache-2.0 |
+| [Cobra](https://github.com/spf13/cobra) | Commands, flags, help text and dispatch in the `shellenv` binary; its `doc` package generates man pages (`cmd/gen-man`, `make man`) | Apache-2.0 |
 
 ### Shells and runtimes shellenv works with
 
