@@ -173,7 +173,8 @@ Each decision is stated as **Decision / Why / Trade-off / Status**.
 - **Decision**: `activate --isolate-home` redirects `HOME`/`TMPDIR`/`XDG_*` at the same
   per-env sandbox `exec` uses (`project.EnsureSandboxDirs`; the CLI pre-creates the dirs so
   stdout stays pure shell code). Every activation — isolated or not — first saves PATH and
-  PS1 (and, when isolating, the five redirected vars) into write-once `SHELLENV_OLD_*`
+  PS1 (and, when isolating, the six redirected vars: `HOME`, `TMPDIR`, `XDG_CONFIG_HOME`,
+  `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`) into write-once `SHELLENV_OLD_*`
   variables. The new `shellenv deactivate` prints guard-everything restore code: whole-PATH
   snapshot restore, guarded per-var restores with an empty→unset rule, then unsets all
   `SHELLENV_*`.

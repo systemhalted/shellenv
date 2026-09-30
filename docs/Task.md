@@ -36,3 +36,5 @@
 - Man pages (DESIGN decision 16): new `cmd/gen-man` generates roff pages from the live Cobra tree (`make man`, gitignored `man/`, bundled into release tarballs beside profiles/). Placeholders like `<env>` are backslash-escaped so md2man doesn't strip them as HTML tags (caught by test: SYNOPSIS read "exec []" before the fix). Kept out of cmd/shellenv so go-md2man/blackfriday stay build-time-only (indirect go.mod entries). README (release + dev notes), AGENTS.md structure updated.
 
 Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.
+
+- Sandbox `XDG_STATE_HOME` (#10): `exec` and `activate --isolate-home` now redirect it to `<sandbox>/.local/state` and `deactivate` restores it; before this, anything run through `exec` could write state into the real `~/.local/state` (found while moving teeup.sh test runs onto shellenv). The exec XDG probe and the Bats isolate-home round-trip both cover it.
