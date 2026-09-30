@@ -115,9 +115,9 @@ func TestInstallHappyPathUnpinnedWarns(t *testing.T) {
 	if !strings.Contains((*cmds)[1][1], "--prefix="+want) {
 		t.Fatalf("configure args = %v", (*cmds)[1])
 	}
-	// bash 5.x still has pre-C23 declarations, so it builds as gnu17 and
+	// bash 5.x still has pre-C23 declarations, so it builds as gnu11 and
 	// gets nothing else.
-	if got := strings.Join((*cmds)[1][2:], " | "); got != "CFLAGS=-O2 -std=gnu17 | CFLAGS_FOR_BUILD=-O2 -std=gnu17" {
+	if got := strings.Join((*cmds)[1][2:], " | "); got != "CFLAGS=-O2 -std=gnu11 | CFLAGS_FOR_BUILD=-O2 -std=gnu11" {
 		t.Fatalf("configure extra args for bash@5.1 = %q", got)
 	}
 	// No pinned checksum: a warning is printed but the build proceeds.
@@ -285,7 +285,7 @@ func TestInstallBash32PassesLegacyCompilerFlags(t *testing.T) {
 }
 
 // bash 5.2's mkbuiltins declares functions with `()`, which C23 (the gcc 15+
-// and clang 16+ default) reads as "no arguments", so 5.x needs -std=gnu17 in
+// and clang 16+ default) reads as "no arguments", so 5.x needs -std=gnu11 in
 // both CFLAGS and CFLAGS_FOR_BUILD.
 func TestInstallBash52PassesPreC23CompilerFlags(t *testing.T) {
 	home := t.TempDir()
@@ -309,7 +309,7 @@ func TestInstallBash52PassesPreC23CompilerFlags(t *testing.T) {
 			configure = c
 		}
 	}
-	for _, want := range []string{"CFLAGS=-O2 -std=gnu17", "CFLAGS_FOR_BUILD=-O2 -std=gnu17"} {
+	for _, want := range []string{"CFLAGS=-O2 -std=gnu11", "CFLAGS_FOR_BUILD=-O2 -std=gnu11"} {
 		found := false
 		for _, a := range configure {
 			if a == want {
