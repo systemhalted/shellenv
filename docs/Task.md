@@ -38,3 +38,5 @@
 Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.
 
 - Sandbox `XDG_STATE_HOME` (#10): `exec` and `activate --isolate-home` now redirect it to `<sandbox>/.local/state` and `deactivate` restores it; before this, anything run through `exec` could write state into the real `~/.local/state` (found while moving teeup.sh test runs onto shellenv). The exec XDG probe and the Bats isolate-home round-trip both cover it.
+
+- Project website: `site/index.html` (single self-contained page, no external assets; light/dark, tabbed activate/exec/container comparison, copy buttons) plus `site/CNAME` for `shellenv.systemhalted.in`, published by a new `pages.yml` workflow (`actions/upload-pages-artifact` + `deploy-pages`, runs on `main` pushes touching `site/`). Rebuilt from a ChatGPT mockup with its errors fixed: each workflow tab now shows its own boundary column (the mockup paired the Execute tab with the Activate column), the `--profile` example sources a script (`. ./probe.sh`) so the profile's options actually apply, the hero includes `init`, and inline flags no longer wrap mid-token. README, AGENTS.md, and CONTRIBUTING.md point at it.

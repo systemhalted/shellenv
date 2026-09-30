@@ -2,6 +2,8 @@
 
 Per-project shell sandboxes for testing scripts against specific shells and option profiles without polluting your real shell setup.
 
+Website: <https://shellenv.systemhalted.in>
+
 ## Intent
 - Treat shells like runtimes: declare the shell version and profile a project expects, and run commands inside that sandbox.
 - Keep experiments contained: environments live under `./.shellenv/<name>` and `SHELLENV_HOME` (default `~/.shellenv`), avoiding edits to your login shell.
@@ -182,6 +184,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 - Architecture, isolation model, and flows: `docs/ARCHITECTURE.md`.
 - Design decisions, rationale, and roadmap: `docs/DESIGN.md`.
 - Task notes and change log: `docs/Task.md`.
+- Project website: `site/` (static HTML, published to GitHub Pages by `.github/workflows/pages.yml` on pushes to `main` that touch it).
 
 ## Testing & dev notes
 - Unit tests: `make test`. Lint and vulnerability scan: `make lint` / `make vulncheck` (need a recent Go toolchain; versions pinned in the Makefile).
