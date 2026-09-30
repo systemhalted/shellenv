@@ -7,7 +7,7 @@ import (
 
 // isolatedVars are the variables activate may have redirected; deactivate
 // restores each only when its SHELLENV_OLD_* save exists.
-var isolatedVars = []string{"HOME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME"}
+var isolatedVars = []string{"HOME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"}
 
 // DeactivationCode emits shell code restoring a session activated by
 // `activate` (with or without --isolate-home). Every restore is guarded on

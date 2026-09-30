@@ -82,11 +82,14 @@ setup() {
 
   run bash -c 'cd proj-iso
     orig_home="$HOME"
+    export XDG_STATE_HOME="$PWD/orig-state"
     eval "$('"$BIN"' activate --isolate-home 2>/dev/null)"
     touch "$HOME/iso-marker"
     [ -f ./.shellenv/default/home/iso-marker ] || { echo "marker not in sandbox"; exit 1; }
+    [ "$XDG_STATE_HOME" = "$HOME/.local/state" ] || { echo "XDG_STATE_HOME not sandboxed: $XDG_STATE_HOME"; exit 1; }
     eval "$('"$BIN"' deactivate)"
     [ "$HOME" = "$orig_home" ] || { echo "HOME not restored"; exit 1; }
+    [ "$XDG_STATE_HOME" = "$PWD/orig-state" ] || { echo "XDG_STATE_HOME not restored: $XDG_STATE_HOME"; exit 1; }
     [ -z "${SHELLENV_ACTIVE-}" ] || { echo "SHELLENV_ACTIVE leaked"; exit 1; }
     echo iso-ok'
   [ "$status" -eq 0 ]

@@ -399,7 +399,7 @@ func TestExecIsolatesXDGDirsIntoSandbox(t *testing.T) {
 		t.Fatalf("mkdir bin: %v", err)
 	}
 	script := filepath.Join(binDir, "xdgprobe")
-	content := "#!/bin/sh\n: > \"$XDG_CONFIG_HOME/cfg\"\n: > \"$XDG_CACHE_HOME/cache\"\n: > \"$XDG_DATA_HOME/data\"\n"
+	content := "#!/bin/sh\n: > \"$XDG_CONFIG_HOME/cfg\"\n: > \"$XDG_CACHE_HOME/cache\"\n: > \"$XDG_DATA_HOME/data\"\n: > \"$XDG_STATE_HOME/state\"\n"
 	if err := os.WriteFile(script, []byte(content), 0o755); err != nil {
 		t.Fatalf("write script: %v", err)
 	}
@@ -413,6 +413,7 @@ func TestExecIsolatesXDGDirsIntoSandbox(t *testing.T) {
 		filepath.Join(sandbox, ".config", "cfg"),
 		filepath.Join(sandbox, ".cache", "cache"),
 		filepath.Join(sandbox, ".local", "share", "data"),
+		filepath.Join(sandbox, ".local", "state", "state"),
 	} {
 		if _, err := os.Stat(p); err != nil {
 			t.Fatalf("XDG write did not land in sandbox at %s: %v", p, err)
