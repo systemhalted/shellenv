@@ -328,7 +328,7 @@ footer .doclinks span { display: block; color: var(--muted); font-size: 15px; }
     <div class="modes">
       <div>
         <h3><code>activate</code></h3>
-        <p>For an interactive session with the env's tools and profile at your prompt. Undo it with <code>eval "$(shellenv deactivate)"</code>.</p>
+        <p>For an interactive session with the env's tools and profile at your prompt. Leave it with <code>eval "$(shellenv deactivate)"</code>, which restores the environment but not shell options the profile set.</p>
         <figure class="tx">
 <pre tabindex="0" aria-label="activate example"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span></code></pre>
         </figure>
@@ -430,7 +430,7 @@ footer .doclinks span { display: block; color: var(--muted); font-size: 15px; }
         <div>
           <h3>Activate, then deactivate</h3>
           <p><code>activate</code> prints a snippet for your shell to <code>eval</code>. <code>deactivate</code> restores <code>PATH</code>, the prompt and any isolated variables, and unsets <code>SHELLENV_*</code>.</p>
-          <p>It can't undo shell options. After the strict profile, <code>set -euo pipefail</code> stays on in that shell, so a failing command will close it. Use a throwaway shell for this.</p>
+          <p>It can't undo shell options. After the strict profile, <code>set -euo pipefail</code> and its <code>IFS</code> stay in effect in that shell, so a failing command will close it. Use a throwaway shell for this.</p>
         </div>
         <figure class="tx">
           <div class="tx-head"><span>bash</span></div>
