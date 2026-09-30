@@ -140,32 +140,6 @@ flowchart TD
     shellpkg --> fsProfiles[("profiles/ lookup")]
 ```
 
-## Open source projects
-
-shellenv is built on, builds, and is tested with the projects below. Only direct dependencies are listed; their own dependencies are in `go.mod` and `go.sum`. Go module versions are pinned in `go.mod`, and Staticcheck and govulncheck versions in the `Makefile`.
-
-### Go module
-
-| Project | Used for | License |
-| --- | --- | --- |
-| [Cobra](https://github.com/spf13/cobra) | Commands, flags, help text and dispatch in the `shellenv` binary; its `doc` package generates man pages (`cmd/gen-man`, `make man`) | Apache-2.0 |
-
-### Shells and runtimes shellenv works with
-
-These are not bundled. `shellenv install` downloads their official source tarballs and builds them on your machine; fish and the container engines must already be installed.
-
-- [GNU Bash](https://www.gnu.org/software/bash/): installed from `ftp.gnu.org`.
-- [Zsh](https://www.zsh.org/): installed from the SourceForge mirror.
-- [fish](https://fishshell.com/): activation and `.fish` profile variants only.
-- [Docker](https://www.docker.com/) or [Podman](https://podman.io/): `exec --container`.
-
-### Development and CI
-
-- [Go](https://go.dev/) toolchain, including `gofmt` and `go vet`.
-- [bats-core](https://github.com/bats-core/bats-core): integration tests in `test/integration`.
-- [Staticcheck](https://staticcheck.dev/) and [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck): `make lint` and `make vulncheck`.
-- [GitHub Actions](https://github.com/features/actions): `actions/checkout`, `actions/setup-go`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`, and [`softprops/action-gh-release`](https://github.com/softprops/action-gh-release) for releases.
-
 ## Command flows
 - **init**: ensures `SHELLENV_HOME` exists, writes `.initialized`.
 - **create**: writes `metadata.json` (name, shell, profile, tools placeholder) and ensures `bin/` exists under `./.shellenv/<env>`.
@@ -330,3 +304,29 @@ These are known gaps between the tool's intent and its current behavior. Priorit
 - **Fish profiles: done (was P2), with a semantic caveat.** Fish activation sources a fish-syntax variant (`<profile>.fish`) when one resolves; there is no fallback to `.sh`. fish itself has no `set -e`/`pipefail` equivalents, so the strict/posix variants only carry comments and exported variables — use a bash/sh env for option-enforcement testing.
 - **Ephemeral cleanup: done (was P2).** `exec --ephemeral` uses a throwaway sandbox home (`./.shellenv/<env>/home-ephemeral-*`) removed after the child exits, success or failure. The persistent `home/` remains the default; `destroy` remains the manual cleanup for whole envs.
 - **Robustness (was P2).** A corrupt `metadata.json` warns on stderr (a missing one stays silent); isolation-breach tests cover XDG redirection, ephemeral teardown, and the guarantee that `activate` stdout never overrides `HOME`/`TMPDIR`/`XDG_*`.
+
+## Open source projects
+
+shellenv is built on, builds, and is tested with the projects below. Only direct dependencies are listed; their own dependencies are in `go.mod` and `go.sum`. Go module versions are pinned in `go.mod`, and Staticcheck and govulncheck versions in the `Makefile`.
+
+### Go module
+
+| Project | Used for | License |
+| --- | --- | --- |
+| [Cobra](https://github.com/spf13/cobra) | Commands, flags, help text and dispatch in the `shellenv` binary; its `doc` package generates man pages (`cmd/gen-man`, `make man`) | Apache-2.0 |
+
+### Shells and runtimes shellenv works with
+
+These are not bundled. `shellenv install` downloads their official source tarballs and builds them on your machine; fish and the container engines must already be installed.
+
+- [GNU Bash](https://www.gnu.org/software/bash/): installed from `ftp.gnu.org`.
+- [Zsh](https://www.zsh.org/): installed from the SourceForge mirror.
+- [fish](https://fishshell.com/): activation and `.fish` profile variants only.
+- [Docker](https://www.docker.com/) or [Podman](https://podman.io/): `exec --container`.
+
+### Development and CI
+
+- [Go](https://go.dev/) toolchain, including `gofmt` and `go vet`.
+- [bats-core](https://github.com/bats-core/bats-core): integration tests in `test/integration`.
+- [Staticcheck](https://staticcheck.dev/) and [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck): `make lint` and `make vulncheck`.
+- [GitHub Actions](https://github.com/features/actions): `actions/checkout`, `actions/setup-go`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`, and [`softprops/action-gh-release`](https://github.com/softprops/action-gh-release) for releases.
