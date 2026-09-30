@@ -17,6 +17,8 @@ This project is provided as-is with no warranties; use at your own risk. See `LI
 ## Install & build
 
 ### From a release
+Release tarballs cover Linux and macOS on amd64 and arm64. There is no native Windows build; on Windows, use the Linux tarball inside WSL.
+
 Download the tarball for your platform from the [releases page](https://github.com/systemhalted/shellenv/releases), verify it against `SHA256SUMS`, extract it, and put the extracted directory on your `PATH`:
 
 ```bash

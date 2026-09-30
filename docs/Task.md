@@ -46,3 +46,5 @@ Tests: `GOCACHE=$(pwd)/.gocache go test ./...`.
 - Docs: trimmed ARCHITECTURE.md's "Open source projects" section to direct dependencies only. The Go table now lists just Cobra (binary and `cobra/doc` for man pages); transitive modules (pflag, mousetrap, go-md2man, Blackfriday, yaml.v3) are left to `go.mod`/`go.sum`. The section moved to the end of ARCHITECTURE.md.
 
 - Release licenses: each release tarball now ships `THIRD_PARTY_LICENSES`, generated per GOOS/GOARCH by `scripts/third-party-licenses.sh` from the modules `go list -deps ./cmd/shellenv` links (today Cobra, Apache-2.0, and pflag, BSD-3-Clause; mousetrap only on Windows). The script fails if a linked module has no license file. `make licenses` runs it locally; `third_party_licenses.bats` checks the Linux module set and that the output follows the target platform. README (release + dev notes) and AGENTS.md updated.
+
+- Docs: README and the website now say which platforms have release builds (Linux and macOS, amd64 and arm64) and point Windows users at the Linux tarball under WSL. There is no native Windows build; `install` compiles shells from source and activation relies on POSIX profiles.
