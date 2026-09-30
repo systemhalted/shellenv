@@ -7,7 +7,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.6.0
 
-.PHONY: build test itest lint vulncheck man
+.PHONY: build test itest lint vulncheck man licenses
 
 build:
 	mkdir -p dist
@@ -35,3 +35,10 @@ vulncheck:
 # gitignored and rebuilt on demand (release tarballs bundle it).
 man:
 	go run ./cmd/gen-man man
+
+# License texts of the third-party modules linked into the binary, for the
+# host GOOS/GOARCH (set them to target another platform). Release tarballs
+# ship this file beside the binary.
+licenses:
+	mkdir -p dist
+	./scripts/third-party-licenses.sh > dist/THIRD_PARTY_LICENSES

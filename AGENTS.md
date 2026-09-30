@@ -12,6 +12,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 - `internal/registry`: Advisory index of project envs (`$SHELLENV_HOME/registry.json`); best-effort, never load-bearing.
 - `internal/shell`: Activation/profile handling.
 - `profiles/`: Option presets (`strict`, `posix`, `interactive`; `.sh` plus `.fish` variants).
+- `scripts/`: Build and release helpers (`third-party-licenses.sh` generates `THIRD_PARTY_LICENSES` for release tarballs).
 - `site/`: Project website (static `index.html` + `CNAME`), deployed to GitHub Pages by `.github/workflows/pages.yml`.
 - `test/`: Integration tests in `test/integration`; Go unit tests live next to code in `internal/*`.
 
