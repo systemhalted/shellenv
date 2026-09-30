@@ -96,7 +96,7 @@ erDiagram
 The two dotted relationships are the deliberately weak ones: a registry entry is advisory (decision 15 — consumers re-read `metadata.json` and prune vanished projects), and a declared runtime may simply not be installed (decision 11 — warn and fall back, or `--strict-shell`).
 
 ## Key packages and libraries
-- **Cobra (github.com/spf13/cobra)**: command-line framework used to define commands, flags, help text, and dispatch (`rootCmd` + subcommands under `internal/cli`). Each command’s `RunE` returns an error so non-zero exits propagate.
+- **[Cobra](https://github.com/spf13/cobra)** (`github.com/spf13/cobra`): command-line framework used to define commands, flags, help text, and dispatch (`rootCmd` + subcommands under `internal/cli`). Each command’s `RunE` returns an error so non-zero exits propagate.
 - `cmd/shellenv`: CLI entrypoint calling `cli.Execute()` to run the Cobra root command.
 - `internal/cli/*`: Cobra command implementations (`init`, `create`, `activate`, `exec`, `install`, etc.).
 - `internal/env`: resolves and prepares `SHELLENV_HOME`; resolves declared shell runtimes under `installs/`.
@@ -116,7 +116,7 @@ flowchart TD
     subgraph commands["command layer"]
         cli["internal/cli<br/>one Cobra command per file"]
     end
-    cobra["github.com/spf13/cobra<br/>(the only external dependency)"] -.-> cli
+    cobra["github.com/spf13/cobra<br/>(the binary's only direct dependency)"] -.-> cli
 
     subgraph mechanics["mechanics (no cross-imports)"]
         env["internal/env<br/>SHELLENV_HOME + runtime resolution"]
@@ -139,6 +139,44 @@ flowchart TD
     project --> fsProj[("./.shellenv")]
     shellpkg --> fsProfiles[("profiles/ lookup")]
 ```
+
+## Open source projects
+
+shellenv is built on, builds, and is tested with the projects below. Go module versions are pinned in `go.mod`, and Staticcheck and govulncheck versions in the `Makefile`.
+
+### Linked into the `shellenv` binary
+
+| Project | Used for | License |
+| --- | --- | --- |
+| [Cobra](https://github.com/spf13/cobra) | Commands, flags, help text, dispatch | Apache-2.0 |
+| [pflag](https://github.com/spf13/pflag) | POSIX/GNU-style flag parsing (via Cobra) | BSD-3-Clause |
+
+Cobra also pulls in [mousetrap](https://github.com/inconshreveable/mousetrap) (Apache-2.0), which is compiled only on Windows, so it is not in the Linux or macOS builds.
+
+### Build-time only (`cmd/gen-man`, `make man`)
+
+| Project | Used for | License |
+| --- | --- | --- |
+| [cobra/doc](https://github.com/spf13/cobra/tree/main/doc) | Generating man pages from the command tree | Apache-2.0 |
+| [go-md2man](https://github.com/cpuguy83/go-md2man) | Markdown to roff conversion | MIT |
+| [Blackfriday](https://github.com/russross/blackfriday) | Markdown parsing for go-md2man | BSD-2-Clause |
+| [go-yaml](https://github.com/go-yaml/yaml) (`gopkg.in/yaml.v3`) | Imported by cobra/doc; unused by shellenv | MIT and Apache-2.0 |
+
+### Shells and runtimes shellenv works with
+
+These are not bundled. `shellenv install` downloads their official source tarballs and builds them on your machine; fish and the container engines must already be installed.
+
+- [GNU Bash](https://www.gnu.org/software/bash/): installed from `ftp.gnu.org`.
+- [Zsh](https://www.zsh.org/): installed from the SourceForge mirror.
+- [fish](https://fishshell.com/): activation and `.fish` profile variants only.
+- [Docker](https://www.docker.com/) or [Podman](https://podman.io/): `exec --container`.
+
+### Development and CI
+
+- [Go](https://go.dev/) toolchain, including `gofmt` and `go vet`.
+- [bats-core](https://github.com/bats-core/bats-core): integration tests in `test/integration`.
+- [Staticcheck](https://staticcheck.dev/) and [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck): `make lint` and `make vulncheck`.
+- [GitHub Actions](https://github.com/features/actions): `actions/checkout`, `actions/setup-go`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`, and [`softprops/action-gh-release`](https://github.com/softprops/action-gh-release) for releases.
 
 ## Command flows
 - **init**: ensures `SHELLENV_HOME` exists, writes `.initialized`.
