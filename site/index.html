@@ -49,14 +49,14 @@ body {
   font: 17px/1.7 var(--sans);
 }
 a { color: var(--link); text-underline-offset: .2em; }
-main:focus { outline: none; }
+main[tabindex="-1"]:focus { outline: none; }
 a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 code, pre { font-family: var(--mono); font-size: .86em; }
 code { white-space: nowrap; }
-pre code { font-size: 1em; }
+pre code { font-size: 1em; white-space: pre; }
 h1, h2, h3 { font-weight: 500; margin: 0; }
 h2 { font-size: clamp(30px, 4.2vw, 42px); line-height: 1.15; letter-spacing: -.025em; }
 h3 { font-size: 19px; line-height: 1.35; font-weight: 600; letter-spacing: -.01em; }
@@ -130,6 +130,8 @@ figure { margin: 0; }
   border: 1px solid var(--term-dim); border-radius: 4px; padding: 6px 10px; cursor: pointer;
 }
 .copy:hover { background: var(--term-rule); }
+.tx :focus-visible { outline-color: var(--term-err); }
+.tx pre:focus-visible { outline-offset: -3px; }
 
 /* Sections */
 main > section { padding: 72px 0; }
@@ -208,7 +210,7 @@ footer h2 { font-size: 28px; }
   <div class="wrap">
     <a class="brand" href="#main"><span class="mark" aria-hidden="true">&gt;_</span> shellenv</a>
     <nav aria-label="Primary">
-      <ul>
+      <ul role="list">
         <li><a href="#install">Install</a></li>
         <li><a href="#modes">Modes</a></li>
         <li><a href="#docs">Docs</a></li>
@@ -234,14 +236,14 @@ footer h2 { font-size: 28px; }
     <figure>
       <div class="tx">
         <div class="tx-head"><span>bash</span></div>
-<pre tabindex="0" aria-label="Terminal transcript"><code><span class="ln" data-s="$">shellenv create --shell bash@5.2 --profile strict</span>
+<pre tabindex="0" role="group" aria-label="Terminal transcript"><code><span class="ln" data-s="$">shellenv create --shell bash@5.2 --profile strict</span>
 <span class="ln" data-s="out">Created env "default" for shell bash@5.2 at …/demo/.shellenv/default</span>
 <span class="ln" data-s="$">shellenv exec -- printenv HOME TMPDIR</span>
 <span class="ln" data-s="out">…/demo/.shellenv/default/home</span>
 <span class="ln" data-s="out">…/demo/.shellenv/default/home/tmp</span></code></pre>
         <div class="tx-foot"><span>env<b>default</b></span> <span>shell<b>bash@5.2</b></span> <span>profile<b>strict</b></span></div>
       </div>
-      <figcaption>Real output from a local build of shellenv v0.3.0. Paths are shortened to <code>…/</code>.</figcaption>
+      <figcaption>Real output from a local build of shellenv v0.3.0, with <code>bash@5.2</code> already installed. Paths are shortened to <code>…/</code>.</figcaption>
     </figure>
   </div>
 </div>
@@ -274,14 +276,14 @@ footer h2 { font-size: 28px; }
 <section id="modes" class="band" aria-labelledby="modes-h">
   <div class="wrap">
     <h2 id="modes-h">Three ways to run</h2>
-    <p class="intro">Each mode puts the env's <code>bin/</code> first on <code>PATH</code>. They differ in how far the isolation goes. The env is the one you name, else <code>./.shellenv/current</code> (set by <code>shellenv use</code>), else <code>default</code>.</p>
+    <p class="intro">The three modes differ in how far the isolation goes. The env is the one you name, else <code>./.shellenv/current</code> (set by <code>shellenv use</code>), else <code>default</code>.</p>
 
     <div class="table-scroll" role="region" aria-labelledby="modes-cap" tabindex="0">
       <table>
         <caption id="modes-cap" class="visually-hidden">What each mode isolates, as in README.md</caption>
         <thead>
           <tr>
-            <td></td>
+            <th scope="col"><span class="visually-hidden">Behaviour</span></th>
             <th scope="col"><code>eval "$(shellenv activate)"</code></th>
             <th scope="col"><code>shellenv exec -- &lt;cmd&gt;</code></th>
             <th scope="col"><code>shellenv exec --container &lt;image&gt; -- &lt;cmd&gt;</code></th>
@@ -304,25 +306,25 @@ footer h2 { font-size: 28px; }
         <h3><code>activate</code></h3>
         <p>An interactive session with the env's tools and profile. Leave it with <code>eval "$(shellenv deactivate)"</code>, which restores the environment but not shell options the profile set.</p>
         <figure class="tx">
-<pre tabindex="0" aria-label="activate example"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span></code></pre>
+<pre tabindex="0" role="group" aria-label="activate example"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span></code></pre>
         </figure>
         <p class="also">Fish pipes it instead:</p>
         <figure class="tx">
-<pre tabindex="0" aria-label="activate example for fish"><code><span class="ln" data-s="$">shellenv activate --shell-type fish | source</span></code></pre>
+<pre tabindex="0" role="group" aria-label="activate example for fish"><code><span class="ln" data-s="$">shellenv activate --shell-type fish | source</span></code></pre>
         </figure>
       </div>
       <div>
         <h3><code>exec</code></h3>
         <p>One-off or scripted runs. Writes through <code>HOME</code>, <code>TMPDIR</code> and <code>XDG_*</code> land in the sandbox, and the exit status passes through. <code>--ephemeral</code> deletes the sandbox home afterwards.</p>
         <figure class="tx">
-<pre tabindex="0" aria-label="exec example"><code><span class="ln" data-s="$">shellenv exec -- ./steps.sh</span></code></pre>
+<pre tabindex="0" role="group" aria-label="exec example"><code><span class="ln" data-s="$">shellenv exec -- ./steps.sh</span></code></pre>
         </figure>
       </div>
       <div>
         <h3><code>exec --container</code></h3>
         <p>For scripts that change the system. Runs in Docker or Podman with the project mounted at the same path. The image supplies the shell, so <code>--strict-shell</code> is rejected.</p>
         <figure class="tx">
-<pre tabindex="0" aria-label="container example"><code><span class="ln" data-s="$">shellenv exec --container debian:stable-slim -- ./steps.sh</span></code></pre>
+<pre tabindex="0" role="group" aria-label="container example"><code><span class="ln" data-s="$">shellenv exec --container debian:stable-slim -- ./steps.sh</span></code></pre>
         </figure>
       </div>
     </div>
@@ -334,7 +336,7 @@ footer h2 { font-size: 28px; }
 <section id="walkthrough" aria-labelledby="walk-h">
   <div class="wrap">
     <h2 id="walk-h">Walkthrough</h2>
-    <p class="intro">From an empty project directory. Output is from a real run; lines starting with <code>2&gt;</code> went to stderr.</p>
+    <p class="intro">From an empty project directory. Output is from a real run, with paths shortened to <code>…/</code>. Lines starting with <code>2&gt;</code> went to stderr.</p>
 
     <ol class="steps" role="list">
       <li>
@@ -343,7 +345,7 @@ footer h2 { font-size: 28px; }
           <p>A temp <code>SHELLENV_HOME</code> keeps the real <code>~/.shellenv</code> untouched while you try things.</p>
         </div>
         <figure class="tx">
-<pre tabindex="0" aria-label="Step 1 transcript"><code><span class="ln" data-s="$">export SHELLENV_HOME="$(mktemp -d)/home"</span>
+<pre tabindex="0" role="group" aria-label="Step 1 transcript"><code><span class="ln" data-s="$">export SHELLENV_HOME="$(mktemp -d)/home"</span>
 <span class="ln" data-s="$">shellenv init</span>
 <span class="ln" data-s="out">Initialized shellenv at …/home</span></code></pre>
         </figure>
@@ -354,7 +356,7 @@ footer h2 { font-size: 28px; }
           <p>Writes <code>./.shellenv/default/</code> with its metadata, <code>bin/</code> and <code>home/</code>.</p>
         </div>
         <figure class="tx">
-<pre tabindex="0" aria-label="Step 2 transcript"><code><span class="ln" data-s="$">shellenv create --shell bash@5.2 --profile strict</span>
+<pre tabindex="0" role="group" aria-label="Step 2 transcript"><code><span class="ln" data-s="$">shellenv create --shell bash@5.2 --profile strict</span>
 <span class="ln" data-s="out">Created env "default" for shell bash@5.2 at …/demo/.shellenv/default</span></code></pre>
         </figure>
       </li>
@@ -364,7 +366,7 @@ footer h2 { font-size: 28px; }
           <p>Until it's installed, commands fall back to the system shell with a warning, or fail with <code>--strict-shell</code>. The build runs once per version.</p>
         </div>
         <figure class="tx">
-<pre tabindex="0" aria-label="Step 3 transcript"><code><span class="ln" data-s="$">shellenv exec -- true</span>
+<pre tabindex="0" role="group" aria-label="Step 3 transcript"><code><span class="ln" data-s="$">shellenv exec -- true</span>
 <span class="ln" data-s="err">warning: declared shell "bash@5.2" is not installed; falling back to the system shell (run 'shellenv install bash@5.2' or use --strict-shell to enforce)</span>
 <span class="ln" data-s="$">shellenv install bash@5.2</span>
 <span class="ln" data-s="out">Downloading https://ftp.gnu.org/gnu/bash/bash-5.2.tar.gz...</span>
@@ -381,7 +383,7 @@ footer h2 { font-size: 28px; }
           <p><code>--profile</code> sources the strict profile first. Its <code>set -e</code> covers what that shell runs directly, so source the script with <code>.</code>. Run through its own shebang, the script gets a fresh shell and only the profile's exported variables.</p>
         </div>
         <figure class="tx">
-<pre tabindex="0" aria-label="Step 4 transcript"><code><span class="ln" data-s="$">printf '#!/bin/sh\necho "step 1"\nfalse\necho "step 2"\n' &gt; steps.sh</span>
+<pre tabindex="0" role="group" aria-label="Step 4 transcript"><code><span class="ln" data-s="$">printf '#!/bin/sh\necho "step 1"\nfalse\necho "step 2"\n' &gt; steps.sh</span>
 <span class="ln" data-s="$">chmod +x steps.sh</span>
 <span class="ln" data-s="$">shellenv exec -- ./steps.sh; echo "exit $?"</span>
 <span class="ln" data-s="out">step 1</span>
@@ -398,7 +400,7 @@ footer h2 { font-size: 28px; }
           <p><code>deactivate</code> restores <code>PATH</code>, the prompt and any isolated variables. It can't undo shell options: after the strict profile, <code>set -euo pipefail</code> and its <code>IFS</code> stay in effect in that shell, so try this in a throwaway one.</p>
         </div>
         <figure class="tx">
-<pre tabindex="0" aria-label="Step 5 transcript"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span>
+<pre tabindex="0" role="group" aria-label="Step 5 transcript"><code><span class="ln" data-s="$">eval "$(shellenv activate)"</span>
 <span class="ln" data-s="$">command -v bash</span>
 <span class="ln" data-s="out">…/home/installs/bash/5.2/bin/bash</span>
 <span class="ln" data-s="$">eval "$(shellenv deactivate)"</span>
@@ -419,7 +421,7 @@ footer h2 { font-size: 28px; }
         <h3>From a release</h3>
         <p>Download a tarball from the <a href="https://github.com/systemhalted/shellenv/releases">releases page</a> and check it against <code>SHA256SUMS</code>. Replace <code>&lt;version&gt;</code> with the one you downloaded.</p>
         <figure class="tx">
-<pre tabindex="0" aria-label="Release install commands"><code><span class="ln" data-s="$">tar -xzf shellenv-&lt;version&gt;-linux-amd64.tar.gz</span>
+<pre tabindex="0" role="group" aria-label="Release install commands"><code><span class="ln" data-s="$">tar -xzf shellenv-&lt;version&gt;-linux-amd64.tar.gz</span>
 <span class="ln" data-s="$">export PATH="$PWD/shellenv-&lt;version&gt;-linux-amd64:$PATH"</span>
 <span class="ln" data-s="$">shellenv --version</span></code></pre>
         </figure>
@@ -432,7 +434,7 @@ footer h2 { font-size: 28px; }
         <h3>From source</h3>
         <p>Needs Go 1.22 or later and <code>make</code>.</p>
         <figure class="tx">
-<pre tabindex="0" aria-label="Source build commands"><code><span class="ln" data-s="$">git clone https://github.com/systemhalted/shellenv.git</span>
+<pre tabindex="0" role="group" aria-label="Source build commands"><code><span class="ln" data-s="$">git clone https://github.com/systemhalted/shellenv.git</span>
 <span class="ln" data-s="$">cd shellenv</span>
 <span class="ln" data-s="$">make build</span>
 <span class="ln" data-s="$">./dist/shellenv --version</span></code></pre>
@@ -453,7 +455,7 @@ footer h2 { font-size: 28px; }
   <div class="wrap">
     <div class="foot-grid">
       <h2>Docs</h2>
-      <ul class="doclinks">
+      <ul class="doclinks" role="list">
         <li><a href="https://github.com/systemhalted/shellenv#readme">README</a> <span>Usage, profiles and the full command reference</span></li>
         <li><a href="https://github.com/systemhalted/shellenv/blob/main/docs/ARCHITECTURE.md">Architecture</a> <span>What is isolated and how execution works</span></li>
         <li><a href="https://github.com/systemhalted/shellenv/blob/main/CONTRIBUTING.md">Contributing</a> <span>Workflow and standards for changes</span></li>
@@ -486,6 +488,8 @@ footer h2 { font-size: 28px; }
     btn.type = 'button';
     btn.className = 'copy';
     btn.textContent = 'Copy';
+    var what = tx.querySelector('pre').getAttribute('aria-label');
+    if (what) btn.setAttribute('aria-label', 'Copy commands: ' + what);
     btn.addEventListener('click', function () {
       function done(msg) {
         btn.textContent = msg;
