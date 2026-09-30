@@ -23,6 +23,7 @@ Keep changes small, tested, and contained to avoid touching your real shell setu
 - Update docs when behavior changes (commands, flags, env vars, profiles, activation logic, defaults).
 - Primary docs: `README.md` (user install/usage), `CONTRIBUTING.md` (workflow/standards), `docs/ARCHITECTURE.md` (architecture/flows), `docs/DESIGN.md` (design decisions and roadmap), `docs/Task.md` (AI task log).
 - Add new files under `docs/` only when needed and link them from `README.md`.
+- The website (`site/index.html`) repeats key commands and the isolation table from `README.md`; update it when those change. It deploys to GitHub Pages when merged to `main`.
 
 ## Commits and PRs
 - Use concise, imperative commit messages (e.g., `Add profile resolver guard`).

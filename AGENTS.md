@@ -12,6 +12,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 - `internal/registry`: Advisory index of project envs (`$SHELLENV_HOME/registry.json`); best-effort, never load-bearing.
 - `internal/shell`: Activation/profile handling.
 - `profiles/`: Option presets (`strict`, `posix`, `interactive`; `.sh` plus `.fish` variants).
+- `site/`: Project website (static `index.html` + `CNAME`), deployed to GitHub Pages by `.github/workflows/pages.yml`.
 - `test/`: Integration tests in `test/integration`; Go unit tests live next to code in `internal/*`.
 
 ## Build, Test, and Development Commands
@@ -33,7 +34,7 @@ This document is a quick guide for contributors working on the shellenv CLI. Kee
 
 ## Documentation
 - Primary docs live in README.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, docs/DESIGN.md, and docs/Task.md. Add new docs under docs/ only when needed; get maintainer buy-in and link them from README.md.
-- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = architecture, flows, sequences; docs/DESIGN.md = design decisions and roadmap; docs/Task.md = AI task log for completed work; release notes are published on GitHub Releases (tag-triggered `release.yml`).
+- Content boundaries: README.md = install/usage/troubleshooting for end users; CONTRIBUTING.md = contributor workflow and standards; docs/ARCHITECTURE.md = architecture, flows, sequences; docs/DESIGN.md = design decisions and roadmap; docs/Task.md = AI task log for completed work; release notes are published on GitHub Releases (tag-triggered `release.yml`); site/index.html = the public landing page, which summarizes README and must stay consistent with it.
 - Update docs whenever behavior changes: new/changed commands, flags, env vars, profiles, activation logic, or config defaults; keep examples in sync.
 - Style/ownership: short headings, concise sentences, consistent formatting; a reviewer must sign off doc updates that accompany behavior changes.
 - Always update the necessary files after completion of work and before the code is committed and pushed to the remote repo.
