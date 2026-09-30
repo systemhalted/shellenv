@@ -224,7 +224,7 @@ footer h2 { font-size: 28px; }
   <div class="wrap hero-grid">
     <div>
       <h1>Per-project shell sandboxes.</h1>
-      <p class="lede">Pin the shell version and option profile a project expects. <code>shellenv exec</code> runs a command with <code>HOME</code>, <code>TMPDIR</code> and <code>XDG_*</code> writes redirected into the project, so your shell and real home stay as they were.</p>
+      <p class="lede">Pin the shell version and option profile a project expects. <code>shellenv exec</code> points <code>HOME</code>, <code>TMPDIR</code> and <code>XDG_*</code> into the project, so writes that go through them stay out of your real home.</p>
       <div class="buttons">
         <a class="button solid" href="#install">Install</a>
         <a class="button" href="https://github.com/systemhalted/shellenv">GitHub</a>
@@ -241,7 +241,7 @@ footer h2 { font-size: 28px; }
 <span class="ln" data-s="out">…/demo/.shellenv/default/home/tmp</span></code></pre>
         <div class="tx-foot"><span>env<b>default</b></span> <span>shell<b>bash@5.2</b></span> <span>profile<b>strict</b></span></div>
       </div>
-      <figcaption>Real output from shellenv v0.3.0. Paths are shortened to <code>…/</code>.</figcaption>
+      <figcaption>Real output from a local build of shellenv v0.3.0. Paths are shortened to <code>…/</code>.</figcaption>
     </figure>
   </div>
 </div>
@@ -257,7 +257,7 @@ footer h2 { font-size: 28px; }
       </div>
       <div>
         <dt>Option profile</dt>
-        <dd><code>strict</code> (<code>set -euo pipefail</code>), <code>posix</code> or <code>interactive</code>. Fish sessions use a <code>.fish</code> variant; shellenv doesn't install fish.</dd>
+        <dd><code>strict</code> (<code>set -euo pipefail</code>), <code>posix</code> or <code>interactive</code>. Fish activation uses a <code>.fish</code> variant; shellenv doesn't install fish.</dd>
       </div>
       <div>
         <dt>PATH</dt>
@@ -313,7 +313,7 @@ footer h2 { font-size: 28px; }
       </div>
       <div>
         <h3><code>exec</code></h3>
-        <p>One-off or scripted runs. Writes land in the sandbox and the exit status passes through. <code>--ephemeral</code> deletes the sandbox home afterwards.</p>
+        <p>One-off or scripted runs. Writes through <code>HOME</code>, <code>TMPDIR</code> and <code>XDG_*</code> land in the sandbox, and the exit status passes through. <code>--ephemeral</code> deletes the sandbox home afterwards.</p>
         <figure class="tx">
 <pre tabindex="0" aria-label="exec example"><code><span class="ln" data-s="$">shellenv exec -- ./steps.sh</span></code></pre>
         </figure>
@@ -327,7 +327,7 @@ footer h2 { font-size: 28px; }
       </div>
     </div>
 
-    <p class="scope"><strong>Know the boundary.</strong> Host mode (<code>activate</code> and <code>exec</code>) is a user-space sandbox, not a security sandbox for untrusted code. <code>exec</code> keeps writes out of your real home; <code>activate</code> does so only with <code>--isolate-home</code>. The network, processes and the rest of the filesystem stay shared unless you use <code>--container</code>. <a href="https://github.com/systemhalted/shellenv/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> has the details.</p>
+    <p class="scope"><strong>Know the boundary.</strong> Host mode (<code>activate</code> and <code>exec</code>) is a user-space sandbox, not a security sandbox for untrusted code. <code>exec</code> redirects writes that go through <code>HOME</code>, <code>TMPDIR</code> and <code>XDG_*</code>; <code>activate</code> does so only with <code>--isolate-home</code>. The network, processes and the rest of the filesystem stay shared unless you use <code>--container</code>. <a href="https://github.com/systemhalted/shellenv/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> has the details.</p>
   </div>
 </section>
 
