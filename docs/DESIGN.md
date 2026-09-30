@@ -229,7 +229,8 @@ high-value, and directly serve "don't impact the host."
 
 - **R1 (P0) — Isolate `HOME`/`TMPDIR`/`XDG_*` for `exec`. _Done._** `exec` creates a per-env
   sandbox home (`./.shellenv/<env>/home/`, via `project.SandboxHomeDir`) and overrides
-  `HOME`/`TMPDIR`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME`/`XDG_DATA_HOME` in the child env only.
+  `HOME`/`TMPDIR`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME`/`XDG_DATA_HOME`/`XDG_STATE_HOME` in the child env only
+  (`XDG_STATE_HOME` was added later, after it let a test write into the real `~/.local/state`).
   The remaining piece — the same isolation for an `eval`'d `activate` session — landed as
   R7 (`activate --isolate-home`, opt-in).
 - **R2 (P0) — Make `exec` honor the declared profile. _Done._** `exec --profile` sources the

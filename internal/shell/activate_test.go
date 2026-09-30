@@ -77,6 +77,7 @@ func TestActivationCodeIsolateHome(t *testing.T) {
 		"export XDG_CONFIG_HOME=" + sb.XDGConfig,
 		"export XDG_CACHE_HOME=" + sb.XDGCache,
 		"export XDG_DATA_HOME=" + sb.XDGData,
+		"export XDG_STATE_HOME=" + sb.XDGState,
 	} {
 		if !strings.Contains(bash, want) {
 			t.Fatalf("bash isolate-home activation missing %q, got: %s", want, bash)

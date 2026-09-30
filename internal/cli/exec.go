@@ -132,6 +132,7 @@ var execCmd = &cobra.Command{
 		childEnv = upsertEnv(childEnv, "XDG_CONFIG_HOME", sb.XDGConfig)
 		childEnv = upsertEnv(childEnv, "XDG_CACHE_HOME", sb.XDGCache)
 		childEnv = upsertEnv(childEnv, "XDG_DATA_HOME", sb.XDGData)
+		childEnv = upsertEnv(childEnv, "XDG_STATE_HOME", sb.XDGState)
 
 		var child *exec.Cmd
 		if execContainer != "" {

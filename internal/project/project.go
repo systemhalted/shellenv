@@ -37,6 +37,7 @@ type SandboxPaths struct {
 	XDGConfig string
 	XDGCache  string
 	XDGData   string
+	XDGState  string
 }
 
 // SandboxLayout maps a sandbox home dir to its full path layout.
@@ -47,13 +48,14 @@ func SandboxLayout(home string) SandboxPaths {
 		XDGConfig: filepath.Join(home, ".config"),
 		XDGCache:  filepath.Join(home, ".cache"),
 		XDGData:   filepath.Join(home, ".local", "share"),
+		XDGState:  filepath.Join(home, ".local", "state"),
 	}
 }
 
 // EnsureSandboxDirs creates the sandbox layout rooted at home.
 func EnsureSandboxDirs(home string) (SandboxPaths, error) {
 	sb := SandboxLayout(home)
-	for _, d := range []string{sb.Home, sb.Tmp, sb.XDGConfig, sb.XDGCache, sb.XDGData} {
+	for _, d := range []string{sb.Home, sb.Tmp, sb.XDGConfig, sb.XDGCache, sb.XDGData, sb.XDGState} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return SandboxPaths{}, err
 		}

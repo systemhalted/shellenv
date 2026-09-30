@@ -103,6 +103,7 @@ func sandboxVars(sb *project.SandboxPaths) []struct{ name, dir string } {
 		{"XDG_CONFIG_HOME", sb.XDGConfig},
 		{"XDG_CACHE_HOME", sb.XDGCache},
 		{"XDG_DATA_HOME", sb.XDGData},
+		{"XDG_STATE_HOME", sb.XDGState},
 	}
 }
 
