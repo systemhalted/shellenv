@@ -29,6 +29,8 @@ Keep the binary next to its bundled `profiles/` directory — built-in profiles 
 
 Tarballs also bundle generated man pages under `man/` — read them in place with `man -l man/shellenv.1`, or install them: `cp man/*.1 ~/.local/share/man/man1/` (then `man shellenv`, `man shellenv-exec`, …).
 
+Each tarball also includes `LICENSE` (shellenv, MIT) and `THIRD_PARTY_LICENSES`, the license texts of the Go modules built into that binary.
+
 ### From source
 Prerequisites: **Go 1.22+** and `make` on your `PATH` (plus [`bats`](https://github.com/bats-core/bats-core) only if you run the integration tests).
 
@@ -190,6 +192,7 @@ shellenv exec --profile -- ./run-tests.sh || exit $?   # fail the build on a non
 ## Testing & dev notes
 - Unit tests: `make test`. Lint and vulnerability scan: `make lint` / `make vulncheck` (need a recent Go toolchain; versions pinned in the Makefile).
 - Man pages: `make man` regenerates `man/` from the live command tree (gitignored; release tarballs bundle it).
+- Third-party licenses: `make licenses` writes `dist/THIRD_PARTY_LICENSES` via `scripts/third-party-licenses.sh`, which lists the modules `go list -deps ./cmd/shellenv` links for the current `GOOS`/`GOARCH`. The release workflow runs it per platform.
 - Integration tests (require `bats`): `SHELLENV_HOME=$(mktemp -d) bats -r test/integration`. The real-source-build test is skipped unless `SHELLENV_TEST_REAL_INSTALL=1` is set (network + several minutes). The container test skips when no docker/podman is found — set `SHELLENV_TEST_REQUIRE_CONTAINER=1` (CI does, on Linux) to make that a failure instead.
 - If your environment restricts the default Go cache, use a repo-local one: `GOCACHE=$PWD/.cache/go-build go test ./...`.
 - Keep experiments isolated by pointing `SHELLENV_HOME` at a temp directory when hacking on the tool.
