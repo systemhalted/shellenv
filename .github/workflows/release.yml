@@ -44,7 +44,9 @@ jobs:
               CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build \
                 -ldflags "-X github.com/systemhalted/shellenv/internal/cli.version=${GITHUB_REF_NAME}" \
                 -o "release/$dir/shellenv" ./cmd/shellenv
-              GOOS="$os" GOARCH="$arch" ./scripts/third-party-licenses.sh \
+              # Same build constraints as the go build above, so the license
+              # list matches the modules actually linked.
+              CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" ./scripts/third-party-licenses.sh \
                 > "release/$dir/THIRD_PARTY_LICENSES"
               cp -r profiles man README.md LICENSE "release/$dir/"
               tar -C release -czf "release/$dir.tar.gz" "$dir"
