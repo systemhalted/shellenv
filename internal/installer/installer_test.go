@@ -115,9 +115,10 @@ func TestInstallHappyPathUnpinnedWarns(t *testing.T) {
 	if !strings.Contains((*cmds)[1][1], "--prefix="+want) {
 		t.Fatalf("configure args = %v", (*cmds)[1])
 	}
-	// A current bash builds with the compiler's defaults: no extra flags.
-	if len((*cmds)[1]) != 2 {
-		t.Fatalf("configure got extra args for bash@5.1: %v", (*cmds)[1])
+	// bash 5.x still has pre-C23 declarations, so it builds as gnu17 and
+	// gets nothing else.
+	if got := strings.Join((*cmds)[1][2:], " | "); got != "CFLAGS=-O2 -std=gnu17 | CFLAGS_FOR_BUILD=-O2 -std=gnu17" {
+		t.Fatalf("configure extra args for bash@5.1 = %q", got)
 	}
 	// No pinned checksum: a warning is printed but the build proceeds.
 	if !strings.Contains(out.String(), "no pinned checksum") {
@@ -279,6 +280,44 @@ func TestInstallBash32PassesLegacyCompilerFlags(t *testing.T) {
 	for _, a := range configure[1:] {
 		if strings.HasPrefix(a, "CFLAGS") && !strings.Contains(a, "-std=gnu89") {
 			t.Fatalf("%s lacks -std=gnu89", a)
+		}
+	}
+}
+
+// bash 5.2's mkbuiltins declares functions with `()`, which C23 (the gcc 15+
+// and clang 16+ default) reads as "no arguments", so 5.x needs -std=gnu17 in
+// both CFLAGS and CFLAGS_FOR_BUILD.
+func TestInstallBash52PassesPreC23CompilerFlags(t *testing.T) {
+	home := t.TempDir()
+	in, cmds, _ := fakeInstaller(t, home)
+	sum := sha256.Sum256([]byte("fake-tarball"))
+	in.pinned = map[string]string{"bash@5.2": hex.EncodeToString(sum[:])}
+	run := in.Run
+	in.Run = func(dir string, logTo *os.File, name string, args ...string) error {
+		if name == "make" && len(args) > 0 && args[len(args)-1] == "install" {
+			return os.MkdirAll(filepath.Join(in.prefix("bash", "5.2"), "bin"), 0o755)
+		}
+		return run(dir, logTo, name, args...)
+	}
+
+	if _, err := in.Install("bash", "5.2"); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	var configure []string
+	for _, c := range *cmds {
+		if c[0] == "./configure" {
+			configure = c
+		}
+	}
+	for _, want := range []string{"CFLAGS=-O2 -std=gnu17", "CFLAGS_FOR_BUILD=-O2 -std=gnu17"} {
+		found := false
+		for _, a := range configure {
+			if a == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("configure args missing %q: %v", want, configure)
 		}
 	}
 }

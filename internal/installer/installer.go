@@ -40,13 +40,25 @@ var pinnedChecksums = map[string]string{
 const legacyBashCFlags = "-O2 -std=gnu89 -fcommon -Wno-implicit-function-declaration " +
 	"-Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types"
 
+// preC23BashCFlags lets bash 4.x and 5.x build with the same compilers: their
+// sources are C99-era, but mkbuiltins still declares functions with `()`,
+// which C23 reads as "no arguments" (gcc 15+: "too many arguments to function
+// 'xmalloc'"). gnu17 keeps the old meaning.
+const preC23BashCFlags = "-O2 -std=gnu17"
+
 // configureArgs is the extra arguments ./configure gets for shell@version.
 // autoconf takes VAR=value arguments, so no environment change is needed.
 // CFLAGS_FOR_BUILD covers bash's build-time helpers (mkbuiltins), which do
 // not use CFLAGS.
 func configureArgs(shell, version string) []string {
-	if shell == "bash" && strings.HasPrefix(version, "3.") {
+	if shell != "bash" {
+		return nil
+	}
+	switch {
+	case strings.HasPrefix(version, "3."):
 		return []string{"CFLAGS=" + legacyBashCFlags, "CFLAGS_FOR_BUILD=" + legacyBashCFlags}
+	case strings.HasPrefix(version, "4."), strings.HasPrefix(version, "5."):
+		return []string{"CFLAGS=" + preC23BashCFlags, "CFLAGS_FOR_BUILD=" + preC23BashCFlags}
 	}
 	return nil
 }
